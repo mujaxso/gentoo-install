@@ -14,19 +14,47 @@ format_partitions() {
 
 mount_filesystems() {
     local mp="${CONFIG[MOUNT_POINT]}"
+    
+    # Ensure mount point exists
     mkdir -p "$mp"
+    
+    # Unmount anything that might already be mounted there
+    umount "$mp" 2>/dev/null || true
+    
+    # Mount root filesystem
     case "${CONFIG[FILESYSTEM]}" in
         ext4) source "${MODULE_DIR}/fs/ext4.sh"; mount_ext4_root;;
         btrfs) source "${MODULE_DIR}/fs/btrfs.sh"; mount_btrfs_root;;
         zfs) source "${MODULE_DIR}/fs/zfs.sh"; mount_zfs_root;;
     esac
+    
+    # Verify root is mounted
+    if ! mountpoint -q "$mp"; then
+        log_error "Root filesystem is not mounted at $mp"
+        return 1
+    fi
+    
+    # Create and mount boot partition
     mkdir -p "${mp}/boot"
-    mount "${CONFIG[BOOT_PART]}" "${mp}/boot"
+    mount "${CONFIG[BOOT_PART]}" "${mp}/boot" || {
+        log_error "Failed to mount boot partition ${CONFIG[BOOT_PART]}"
+        return 1
+    }
+    
+    # Create and mount EFI partition if needed
     if [ "${CONFIG[BOOT_MODE]}" = "efi" ]; then
         mkdir -p "${mp}/boot/efi"
-        mount "${CONFIG[EFI_PART]}" "${mp}/boot/efi"
+        mount "${CONFIG[EFI_PART]}" "${mp}/boot/efi" || {
+            log_error "Failed to mount EFI partition ${CONFIG[EFI_PART]}"
+            return 1
+        }
     fi
-    log_success "Mounted"
+    
+    # Show mounted filesystems for verification
+    log_info "Mounted filesystems:"
+    df -h | grep -E "(${mp}|boot|efi)" || log_info "No matching mounts found"
+    
+    log_success "Filesystems mounted successfully"
 }
 
 umount_all() {

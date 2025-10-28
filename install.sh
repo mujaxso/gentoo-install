@@ -145,6 +145,24 @@ install_base_system() {
         return 1
     fi
     
+    # Verify mount point is ready for installation
+    local mp="${CONFIG[MOUNT_POINT]}"
+    if ! mountpoint -q "$mp"; then
+        show_error "Mount point $mp is not mounted! Cannot proceed with installation."
+        log_error "Please check disk configuration and try again."
+        return 1
+    fi
+    
+    # Check available space on mount point
+    local available_mb=$(df -m "$mp" | awk 'NR==2 {print $4}')
+    if [[ $available_mb -lt 5000 ]]; then
+        show_error "Insufficient space on target filesystem!"
+        log_error "Only ${available_mb}MB available, need at least 5000MB"
+        return 1
+    fi
+    
+    log_success "Mount point verified: $mp (${available_mb}MB available)"
+    
     # Try automatic download first, then fallback to manual
     if ! download_stage3; then
         show_error "Automatic stage3 download failed"
