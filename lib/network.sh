@@ -59,6 +59,14 @@ test_http_download() {
         if command -v curl &>/dev/null; then
             if curl -f -s --connect-timeout 10 "$test_url" | head -n 5 &>/dev/null; then
                 log_success "HTTP test passed with curl: $test_url"
+                # Also test if we can parse the content
+                local content=$(curl -f -s --connect-timeout 10 "$test_url")
+                if [[ -n "$content" ]]; then
+                    log_info "Content preview of $test_url:"
+                    echo "$content" | head -n 3 | while read line; do
+                        log_info "  $line"
+                    done
+                fi
                 return 0
             fi
         elif command -v wget &>/dev/null; then

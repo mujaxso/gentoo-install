@@ -33,17 +33,20 @@ download_stage3() {
         
         if [[ -n "$latest_content" ]]; then
             log_info "Successfully fetched latest stage3 info"
-            # Debug: show first few lines of content
-            log_info "First few lines of response:"
-            echo "$latest_content" | head -n 3 | while read line; do
-                log_info "  $line"
-            done
-        
+            # Debug: show the entire content for troubleshooting
+            log_info "Full response content:"
+            echo "$latest_content"
+            
             # Parse the latest stage3 filename from the content
             # The format is: timestamp stage3-filename size hash
-            # We want the first field (filename)
-            stage3_filename=$(echo "$latest_content" | grep -v "^#" | grep "stage3-amd64-${variant}" | awk '{print $1}' | head -n1)
-        
+            # We want the SECOND field (filename), not the first
+            stage3_filename=$(echo "$latest_content" | grep -v "^#" | grep "stage3-amd64-${variant}" | awk '{print $2}' | head -n1)
+            
+            # If second field is empty, try first field (fallback)
+            if [[ -z "$stage3_filename" ]]; then
+                stage3_filename=$(echo "$latest_content" | grep -v "^#" | grep "stage3-amd64-${variant}" | awk '{print $1}' | head -n1)
+            fi
+            
             if [[ -n "$stage3_filename" ]]; then
                 download_url="${mirror}/${stage3_filename}"
                 log_success "Found latest stage3: $stage3_filename"
@@ -53,7 +56,9 @@ download_stage3() {
                 log_error "Looking for pattern: stage3-amd64-${variant}"
                 log_error "Available stage3 files in response:"
                 echo "$latest_content" | grep "stage3-amd64" | head -n 5 | while read line; do
-                    log_error "  $line"
+                    log_error "  Line: $line"
+                    log_error "  Field 1: $(echo "$line" | awk '{print $1}')"
+                    log_error "  Field 2: $(echo "$line" | awk '{print $2}')"
                 done
             fi
         else
@@ -67,6 +72,14 @@ download_stage3() {
         log_error "  - Internet connection"
         log_error "  - Gentoo mirror availability"
         log_error "  - The variant '${variant}' exists"
+        
+        # Test direct access to the latest file
+        local test_url="https://distfiles.gentoo.org/releases/amd64/autobuilds/latest-stage3-amd64-${variant}.txt"
+        log_info "Testing direct access to: $test_url"
+        if command -v curl &>/dev/null; then
+            curl -I "$test_url" 2>/dev/null && log_info "URL is accessible" || log_error "URL is not accessible"
+        fi
+        
         return 1
     fi
     
@@ -212,6 +225,21 @@ download_stage3_manual() {
     # Show example URLs based on the selected init system
     local variant=$([[ "${CONFIG[INIT_SYSTEM]}" == "systemd" ]] && echo "systemd" || echo "openrc")
     local example_url="https://distfiles.gentoo.org/releases/amd64/autobuilds/latest-stage3-amd64-${variant}.txt"
+    
+    # Try to fetch and display the latest URLs automatically
+    log_info "Attempting to fetch latest stage3 URLs for you..."
+    if command -v curl &>/dev/null; then
+        local latest_content=$(curl -s "$example_url" 2>/dev/null || echo "")
+        if [[ -n "$latest_content" ]]; then
+            show_info "Latest available stage3 files:"
+            echo "$latest_content" | grep "stage3-amd64-${variant}" | head -n 3 | while read line; do
+                local filename=$(echo "$line" | awk '{print $2}')
+                if [[ -n "$filename" ]]; then
+                    show_info "  https://distfiles.gentoo.org/releases/amd64/autobuilds/${filename}"
+                fi
+            done
+        fi
+    fi
     
     show_info "Example: Visit $example_url to find the latest URL"
     show_info "Format should be: https://distfiles.gentoo.org/releases/amd64/autobuilds/YYYYMMDDTHHMMSSZ/stage3-amd64-${variant}-YYYYMMDDTHHMMSSZ.tar.xz"
