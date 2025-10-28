@@ -234,11 +234,12 @@ main_menu() {
 main() {
   check_root || exit 1
   check_dependencies || exit 1
+  check_optional_deps
 
   show_banner
 
   if ! check_internet; then
-    show_error "No internet connection!"
+    show_error "Internet connection check failed!"
     exit 1
   fi
 

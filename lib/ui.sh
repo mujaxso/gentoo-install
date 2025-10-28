@@ -6,25 +6,54 @@ command -v dialog &>/dev/null || DIALOG="whiptail"
 
 show_menu() {
     local title="$1"; shift
-    $DIALOG --clear --title "$title" --menu "Choose:" 20 70 10 "$@" 2>&1 >/dev/tty
+    local result
+    if result=$($DIALOG --clear --title "$title" --menu "Choose:" 20 70 10 "$@" 2>&1 >/dev/tty); then
+        echo "$result"
+        return 0
+    else
+        return 1
+    fi
 }
 
 show_input() {
-    $DIALOG --clear --inputbox "$1" 10 60 "${2:-}" 2>&1 >/dev/tty
+    local result
+    if result=$($DIALOG --clear --inputbox "$1" 10 60 "${2:-}" 2>&1 >/dev/tty); then
+        echo "$result"
+        return 0
+    else
+        return 1
+    fi
 }
 
 show_password() {
-    $DIALOG --clear --passwordbox "$1" 10 60 2>&1 >/dev/tty
+    local result
+    if result=$($DIALOG --clear --passwordbox "$1" 10 60 2>&1 >/dev/tty); then
+        echo "$result"
+        return 0
+    else
+        return 1
+    fi
 }
 
 show_yesno() {
-    $DIALOG --clear --yesno "$1" 12 60
+    $DIALOG --clear --yesno "$1" 12 60 2>&1 >/dev/tty
 }
 
 show_msgbox() {
-    $DIALOG --clear --title "$1" --msgbox "$2" 15 70
+    $DIALOG --clear --title "$1" --msgbox "$2" 15 70 2>&1 >/dev/tty
 }
 
-show_info() { show_msgbox "Information" "$1"; }
-show_error() { show_msgbox "Error" "$1"; }
-show_success() { show_msgbox "Success" "$1"; }
+show_info() { 
+    log_info "$1"
+    show_msgbox "Information" "$1" 
+}
+
+show_error() { 
+    log_error "$1"
+    show_msgbox "Error" "$1" 
+}
+
+show_success() { 
+    log_success "$1"
+    show_msgbox "Success" "$1" 
+}
