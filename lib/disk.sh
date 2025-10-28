@@ -77,20 +77,14 @@ get_partition_name() {
 wipe_disk() {
     show_info "Wiping disk ${CONFIG[INSTALL_DISK]}. ALL DATA WILL BE LOST!"
     if show_yesno "Are you absolutely sure you want to wipe ${CONFIG[INSTALL_DISK]}?"; then
-        # Unmount any mounted partitions first
-        log_info "Unmounting any partitions on ${CONFIG[INSTALL_DISK]}..."
-        for partition in $(lsblk -lnpo NAME "${CONFIG[INSTALL_DISK]}" | grep -v "^${CONFIG[INSTALL_DISK]}$"); do
-            log_info "Unmounting $partition"
-            umount "$partition" 2>/dev/null || true
-        done
+        # Reset disk state first
+        reset_disk_state "${CONFIG[INSTALL_DISK]}"
         
-        # Also try to remove any device mapper mappings (for LUKS, etc.)
-        if command -v dmsetup &>/dev/null; then
-            dmsetup remove_all 2>/dev/null || true
-        fi
-        
-        # Use wipefs to remove signatures
+        # Use wipefs to remove signatures from all partitions and the disk itself
         log_info "Removing existing filesystem signatures..."
+        for partition in $(lsblk -lnpo NAME "${CONFIG[INSTALL_DISK]}" | grep -v "^${CONFIG[INSTALL_DISK]}$"); do
+            wipefs -af "$partition" 2>/dev/null || true
+        done
         wipefs -af "${CONFIG[INSTALL_DISK]}" 2>/dev/null || true
         
         # Clear the first few MB to remove any remaining partition data
@@ -101,28 +95,34 @@ wipe_disk() {
         log_info "Creating new GPT partition table..."
         parted -s "${CONFIG[INSTALL_DISK]}" mklabel gpt
         
-        # Force kernel to reread partition table
+        # Force kernel to reread partition table multiple times
         log_info "Refreshing partition table..."
-        partprobe "${CONFIG[INSTALL_DISK]}" || true
-        sleep 3
-        
-        # Sometimes we need to try multiple times
-        local attempts=5
-        while [ $attempts -gt 0 ]; do
-            if parted -s "${CONFIG[INSTALL_DISK]}" print >/dev/null 2>&1; then
+        local partprobe_attempts=5
+        while [ $partprobe_attempts -gt 0 ]; do
+            if partprobe "${CONFIG[INSTALL_DISK]}" 2>/dev/null; then
                 break
             fi
-            log_info "Waiting for disk to be ready... ($attempts attempts remaining)"
             sleep 2
-            attempts=$((attempts - 1))
+            partprobe_attempts=$((partprobe_attempts - 1))
         done
         
-        if [ $attempts -eq 0 ]; then
-            log_error "Disk is not responding after wipe operation"
-            return 1
-        fi
+        # Wait for disk to settle
+        sleep 3
         
-        log_success "Disk wiped successfully"
+        # Verify the disk is ready
+        local verify_attempts=5
+        while [ $verify_attempts -gt 0 ]; do
+            if parted -s "${CONFIG[INSTALL_DISK]}" print >/dev/null 2>&1; then
+                log_success "Disk wiped successfully"
+                return 0
+            fi
+            log_info "Waiting for disk to be ready... ($verify_attempts attempts remaining)"
+            sleep 2
+            verify_attempts=$((verify_attempts - 1))
+        done
+        
+        log_error "Disk is not responding after wipe operation"
+        return 1
     else
         log_error "Disk wipe cancelled"
         return 1
@@ -134,22 +134,19 @@ create_efi_partitions() {
     
     # Ensure the disk is ready
     log_info "Creating EFI partitions on $disk..."
-    partprobe "$disk" || true
-    sleep 2
     
-    # Create partitions with error handling
-    if ! parted -s "$disk" mkpart primary fat32 1MiB 513MiB; then
-        log_error "Failed to create EFI partition"
-        return 1
-    fi
+    # Refresh partition table before starting
+    partprobe "$disk" 2>/dev/null || true
+    sleep 3
     
-    if ! parted -s "$disk" set 1 esp on; then
-        log_error "Failed to set ESP flag"
-        return 1
-    fi
-    
-    if ! parted -s "$disk" mkpart primary ext4 513MiB 1537MiB; then
-        log_error "Failed to create boot partition"
+    # Create all partitions in one go to minimize kernel update issues
+    log_info "Creating partition layout..."
+    if ! parted -s "$disk" -- \
+        mklabel gpt \
+        mkpart primary fat32 1MiB 513MiB \
+        set 1 esp on \
+        mkpart primary ext4 513MiB 1537MiB; then
+        log_error "Failed to create EFI/boot partitions"
         return 1
     fi
     
@@ -160,20 +157,27 @@ create_efi_partitions() {
     fi
     local swap_end=$((1537 + memory_gb * 1024))
     
-    if ! parted -s "$disk" mkpart primary linux-swap 1537MiB "${swap_end}MiB"; then
-        log_error "Failed to create swap partition"
+    # Create swap and root partitions
+    if ! parted -s "$disk" -- \
+        mkpart primary linux-swap 1537MiB "${swap_end}MiB" \
+        mkpart primary ext4 "${swap_end}MiB" 100%; then
+        log_error "Failed to create swap/root partitions"
         return 1
     fi
     
-    if ! parted -s "$disk" mkpart primary ext4 "${swap_end}MiB" 100%; then
-        log_error "Failed to create root partition"
-        return 1
-    fi
-    
-    # Update kernel partition table
+    # Force kernel to reread partition table multiple times
     log_info "Updating partition table..."
-    partprobe "$disk" || true
-    sleep 3
+    local partprobe_attempts=5
+    while [ $partprobe_attempts -gt 0 ]; do
+        if partprobe "$disk" 2>/dev/null; then
+            break
+        fi
+        sleep 2
+        partprobe_attempts=$((partprobe_attempts - 1))
+    done
+    
+    # Wait longer for partitions to appear
+    sleep 5
     
     # Wait for partitions to be available
     local attempts=10
@@ -188,7 +192,7 @@ create_efi_partitions() {
             break
         fi
         log_info "Waiting for partitions to appear... ($attempts attempts remaining)"
-        sleep 2
+        sleep 3
         attempts=$((attempts - 1))
     done
     
@@ -199,6 +203,10 @@ create_efi_partitions() {
         log_error "  $(get_partition_name "$disk" 2)" 
         log_error "  $(get_partition_name "$disk" 3)"
         log_error "  $(get_partition_name "$disk" 4)"
+        log_error "Current block devices:"
+        lsblk -lnpo NAME "$disk" | while read line; do
+            log_error "  $line"
+        done
         return 1
     fi
     
@@ -212,19 +220,32 @@ create_efi_partitions() {
     log_success "  Boot: ${CONFIG[BOOT_PART]}"
     log_success "  Swap: ${CONFIG[SWAP_PART]}"
     log_success "  Root: ${CONFIG[ROOT_PART]}"
+    
+    # Final partprobe to ensure everything is synced
+    partprobe "$disk" 2>/dev/null || true
+    sleep 2
 }
 
 create_bios_partitions() {
     local disk="${CONFIG[INSTALL_DISK]}"
     
     # Ensure the disk is ready
-    partprobe "$disk" || true
-    sleep 2
+    log_info "Creating BIOS partitions on $disk..."
     
-    # Create partitions
-    parted -s "$disk" mkpart primary 1MiB 2MiB
-    parted -s "$disk" set 1 bios_grub on
-    parted -s "$disk" mkpart primary ext4 2MiB 1026MiB
+    # Refresh partition table before starting
+    partprobe "$disk" 2>/dev/null || true
+    sleep 3
+    
+    # Create all partitions in one go
+    log_info "Creating partition layout..."
+    if ! parted -s "$disk" -- \
+        mklabel gpt \
+        mkpart primary 1MiB 2MiB \
+        set 1 bios_grub on \
+        mkpart primary ext4 2MiB 1026MiB; then
+        log_error "Failed to create BIOS/boot partitions"
+        return 1
+    fi
     
     # Get memory size safely
     local memory_gb=$(get_memory_gb)
@@ -233,33 +254,76 @@ create_bios_partitions() {
     fi
     local swap_end=$((1026 + memory_gb * 1024))
     
-    parted -s "$disk" mkpart primary linux-swap 1026MiB "${swap_end}MiB"
-    parted -s "$disk" mkpart primary ext4 "${swap_end}MiB" 100%
+    # Create swap and root partitions
+    if ! parted -s "$disk" -- \
+        mkpart primary linux-swap 1026MiB "${swap_end}MiB" \
+        mkpart primary ext4 "${swap_end}MiB" 100%; then
+        log_error "Failed to create swap/root partitions"
+        return 1
+    fi
     
-    # Update kernel partition table
-    partprobe "$disk" || true
-    sleep 3
-    
-    # Wait for partitions to be available
-    local attempts=5
-    while [ $attempts -gt 0 ]; do
-        if [[ -e "$(get_partition_name "$disk" 2)" ]] && \
-           [[ -e "$(get_partition_name "$disk" 3)" ]] && \
-           [[ -e "$(get_partition_name "$disk" 4)" ]]; then
+    # Force kernel to reread partition table
+    log_info "Updating partition table..."
+    local partprobe_attempts=5
+    while [ $partprobe_attempts -gt 0 ]; do
+        if partprobe "$disk" 2>/dev/null; then
             break
         fi
         sleep 2
+        partprobe_attempts=$((partprobe_attempts - 1))
+    done
+    
+    # Wait longer for partitions to appear
+    sleep 5
+    
+    # Wait for partitions to be available
+    local attempts=10
+    while [ $attempts -gt 0 ]; do
+        local part2=$(get_partition_name "$disk" 2)
+        local part3=$(get_partition_name "$disk" 3)
+        local part4=$(get_partition_name "$disk" 4)
+        
+        if [[ -e "$part2" ]] && [[ -e "$part3" ]] && [[ -e "$part4" ]]; then
+            log_success "All partitions created successfully"
+            break
+        fi
+        log_info "Waiting for partitions to appear... ($attempts attempts remaining)"
+        sleep 3
         attempts=$((attempts - 1))
     done
+    
+    if [ $attempts -eq 0 ]; then
+        log_error "Some partitions did not appear after creation"
+        log_error "Expected partitions:"
+        log_error "  $(get_partition_name "$disk" 2)" 
+        log_error "  $(get_partition_name "$disk" 3)"
+        log_error "  $(get_partition_name "$disk" 4)"
+        return 1
+    fi
     
     CONFIG[BOOT_PART]=$(get_partition_name "$disk" 2)
     CONFIG[SWAP_PART]=$(get_partition_name "$disk" 3)
     CONFIG[ROOT_PART]=$(get_partition_name "$disk" 4)
+    
+    log_success "Partitions created:"
+    log_success "  Boot: ${CONFIG[BOOT_PART]}"
+    log_success "  Swap: ${CONFIG[SWAP_PART]}"
+    log_success "  Root: ${CONFIG[ROOT_PART]}"
+    
+    # Final partprobe to ensure everything is synced
+    partprobe "$disk" 2>/dev/null || true
+    sleep 2
 }
 
 reset_disk_state() {
     local disk="$1"
     log_info "Resetting disk state for $disk..."
+    
+    # Unmount all partitions on this disk
+    for partition in $(lsblk -lnpo NAME "$disk" | grep -v "^$disk$"); do
+        log_info "Unmounting $partition"
+        umount -f "$partition" 2>/dev/null || true
+    done
     
     # Try to remove any LVM volumes
     if command -v vgremove &>/dev/null; then
@@ -277,6 +341,10 @@ reset_disk_state() {
     if command -v cryptsetup &>/dev/null; then
         cryptsetup close $(dmsetup ls --target crypt | grep -o "^\S*" | xargs -I {} sh -c "cryptsetup status {} 2>/dev/null | grep -q \"$disk\" && echo {}") 2>/dev/null || true
     fi
+    
+    # Force kernel to reread partition table
+    partprobe "$disk" 2>/dev/null || true
+    sleep 2
 }
 
 partition_disk() {
