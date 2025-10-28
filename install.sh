@@ -140,6 +140,11 @@ install_base_system() {
     show_info "Step: $desc"
     if ! $func; then
       show_error "Failed at: $desc"
+      log_error "Check the following:"
+      log_error "  - Internet connection"
+      log_error "  - Disk space availability"
+      log_error "  - Disk permissions"
+      log_error "  - Gentoo mirror availability"
       return 1
     fi
   done
