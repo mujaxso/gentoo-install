@@ -42,7 +42,10 @@ check_internet() {
 }
 
 get_cpu_cores() { nproc; }
-get_memory_gb() { free -g | awk '/^Mem:/{print $2}'; }
+get_memory_gb() { 
+    local mem_kb=$(grep MemTotal /proc/meminfo | awk '{print $2}')
+    echo $(( (mem_kb + 1024*1024 - 1) / (1024*1024) ))
+}
 get_uuid() { blkid -s UUID -o value "$1" 2>/dev/null || echo ""; }
 
 show_banner() {

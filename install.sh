@@ -81,7 +81,16 @@ disk_configuration_menu() {
 
   show_yesno "Enable LUKS encryption?" && CONFIG[USE_ENCRYPTION]="yes" || CONFIG[USE_ENCRYPTION]="no"
 
-  select_target_disk
+  if ! select_target_disk; then
+    return 1
+  fi
+
+  # Check if we're trying to use the root disk
+  local root_disk=$(mount | grep ' / ' | cut -d' ' -f1 | sed 's/[0-9]*$//')
+  if [[ "${CONFIG[INSTALL_DISK]}" == "$root_disk" ]]; then
+    show_error "Cannot use the root disk for installation!"
+    return 1
+  fi
 
   if show_yesno "Partition ${CONFIG[INSTALL_DISK]}? ALL DATA WILL BE LOST!"; then
     partition_disk || {
