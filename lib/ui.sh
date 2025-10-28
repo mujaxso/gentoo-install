@@ -65,6 +65,17 @@ show_dependency_status() {
     fi
 }
 
+show_progress_menu() {
+    local title="$1"
+    local current_step="$2"
+    shift 2
+    local menu_items=("$@")
+    
+    # Add progress indicator to title
+    local progress_title="${title} (Step ${current_step}/6)"
+    show_menu "$progress_title" "${menu_items[@]}"
+}
+
 show_success() { 
     log_success "$1"
     show_msgbox "Success" "$1" 
