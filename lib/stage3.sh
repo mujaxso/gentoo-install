@@ -241,6 +241,21 @@ download_stage3_manual() {
         fi
     fi
     
+    # Offer to browse with lynx if available
+    if command -v lynx &>/dev/null; then
+        if show_yesno "Would you like to browse available stage3 files using lynx?"; then
+            log_info "Opening lynx browser to browse stage3 files..."
+            local base_url="https://distfiles.gentoo.org/releases/amd64/autobuilds/"
+            if lynx "$base_url"; then
+                log_info "Lynx browser closed. You can now enter the URL you found."
+            else
+                log_error "Lynx browser failed to start"
+            fi
+        fi
+    else
+        log_info "Note: Install 'lynx' to browse stage3 files directly in the terminal"
+    fi
+    
     show_info "Example: Visit $example_url to find the latest URL"
     show_info "Format should be: https://distfiles.gentoo.org/releases/amd64/autobuilds/YYYYMMDDTHHMMSSZ/stage3-amd64-${variant}-YYYYMMDDTHHMMSSZ.tar.xz"
     
@@ -289,6 +304,30 @@ download_stage3_manual() {
         fi
     else
         log_error "Manual download failed"
+        return 1
+    fi
+}
+
+# Function to browse and select stage3 using lynx
+browse_stage3_with_lynx() {
+    local variant=$([[ "${CONFIG[INIT_SYSTEM]}" == "systemd" ]] && echo "systemd" || echo "openrc")
+    local base_url="https://distfiles.gentoo.org/releases/amd64/autobuilds/"
+    
+    show_info "Opening lynx browser to browse stage3 files..."
+    show_info "Navigate to find: stage3-amd64-${variant}-YYYYMMDDTHHMMSSZ.tar.xz"
+    show_info "Press 'q' to quit lynx, then enter the URL below."
+    
+    if lynx "$base_url"; then
+        local selected_url=$(show_input "Enter the full URL of the stage3 file you found:" "")
+        if [[ -n "$selected_url" ]]; then
+            echo "$selected_url"
+            return 0
+        else
+            log_error "No URL provided"
+            return 1
+        fi
+    else
+        log_error "Failed to start lynx browser"
         return 1
     fi
 }

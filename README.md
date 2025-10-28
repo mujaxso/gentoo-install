@@ -44,6 +44,7 @@ Ensure you have the following tools available in your live environment:
 - `curl` or `wget` for downloads
 - `tar` for archive extraction
 - `lsblk` and `blkid` for disk operations
+- `lynx` for manual stage3 file browsing (optional but recommended)
 
 ## 🛠️ Installation Guide
 

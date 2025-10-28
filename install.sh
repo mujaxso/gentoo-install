@@ -166,14 +166,67 @@ install_base_system() {
     # Try automatic download first, then fallback to manual
     if ! download_stage3; then
         show_error "Automatic stage3 download failed"
-        if show_yesno "Would you like to manually specify a stage3 URL?"; then
+        local manual_choice=$(show_menu "Manual Download Options" \
+            "1" "Enter URL manually" \
+            "2" "Browse with lynx (if available)" \
+            "3" "Cancel and exit")
+        
+        case $manual_choice in
+        1)
             if ! download_stage3_manual; then
-                show_error "Manual download also failed"
+                show_error "Manual download failed"
                 return 1
             fi
-        else
+            ;;
+        2)
+            if command -v lynx &>/dev/null; then
+                local selected_url=$(browse_stage3_with_lynx)
+                if [[ -n "$selected_url" ]]; then
+                    log_info "Downloading from selected URL: $selected_url"
+                    # Use the same download logic as manual download
+                    if command -v wget &>/dev/null; then
+                        if ! wget --timeout=60 --tries=3 --show-progress -O "stage3.tar.xz" "$selected_url"; then
+                            show_error "Download failed with wget"
+                            return 1
+                        fi
+                    elif command -v curl &>/dev/null; then
+                        if ! curl -L --connect-timeout 60 --retry 3 --progress-bar -o "stage3.tar.xz" "$selected_url"; then
+                            show_error "Download failed with curl"
+                            return 1
+                        fi
+                    else
+                        show_error "Neither wget nor curl available for download"
+                        return 1
+                    fi
+                    
+                    # Verify download
+                    if [[ -f "stage3.tar.xz" ]]; then
+                        local file_size=$(stat -c%s "stage3.tar.xz" 2>/dev/null || echo "0")
+                        if [[ $file_size -gt 104857600 ]]; then
+                            CONFIG[STAGE3_FILE]="$mp/stage3.tar.xz"
+                            log_success "Manual download successful ($((file_size/1024/1024)) MB)"
+                        else
+                            log_error "Downloaded file too small"
+                            rm -f "stage3.tar.xz"
+                            return 1
+                        fi
+                    else
+                        log_error "Downloaded file not found"
+                        return 1
+                    fi
+                else
+                    return 1
+                fi
+            else
+                show_error "Lynx is not available. Please install it or use manual URL entry."
+                return 1
+            fi
+            ;;
+        3|*)
+            show_error "Stage3 download cancelled"
             return 1
-        fi
+            ;;
+        esac
     fi
     
     # Continue with remaining steps

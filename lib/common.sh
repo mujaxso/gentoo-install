@@ -71,6 +71,16 @@ get_package_name() {
                 *) echo "$dep" ;;
             esac
             ;;
+        lynx)
+            case "$distro" in
+                gentoo) echo "lynx" ;;
+                debian|ubuntu) echo "lynx" ;;
+                centos|rhel|fedora) echo "lynx" ;;
+                arch) echo "lynx" ;;
+                alpine) echo "lynx" ;;
+                *) echo "$dep" ;;
+            esac
+            ;;
         *)
             echo "$dep"
             ;;
@@ -81,7 +91,7 @@ check_dependencies() {
     log_header "Checking Dependencies"
     
     local missing_deps=()
-    local critical_deps=("dialog" "parted" "curl" "wget" "tar" "lsblk" "blkid")
+    local critical_deps=("dialog" "parted" "curl" "wget" "tar" "lsblk" "blkid" "lynx")
     
     # Check which dependencies are missing
     for dep in "${critical_deps[@]}"; do
