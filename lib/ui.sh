@@ -53,6 +53,18 @@ show_error() {
     show_msgbox "Error" "$1" 
 }
 
+show_dependency_status() {
+    local title="$1"
+    local status="$2"  # "missing" or "available"
+    local deps_list="$3"
+    
+    if [[ "$status" == "available" ]]; then
+        show_msgbox "$title" "All dependencies are available:\n\n$deps_list"
+    else
+        show_msgbox "$title" "Missing dependencies:\n\n$deps_list"
+    fi
+}
+
 show_success() { 
     log_success "$1"
     show_msgbox "Success" "$1" 

@@ -233,7 +233,13 @@ main_menu() {
 
 main() {
   check_root || exit 1
-  check_dependencies || exit 1
+  
+  # Check dependencies with automatic installation option
+  if ! check_dependencies; then
+    show_error "Dependency check failed. Exiting."
+    exit 1
+  fi
+  
   check_optional_deps
 
   show_banner

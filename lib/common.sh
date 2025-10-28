@@ -20,57 +20,147 @@ check_root() {
   fi
 }
 
-check_dependencies() {
-  log_header "Checking Dependencies"
-  
-  local missing=0
-  local deps=(
-    "dialog:Required for text-based user interface"
-    "parted:Disk partitioning tool"
-    "curl:Downloading stage3 and other files"
-    "wget:Alternative download tool"
-    "tar:Extracting stage3 archive"
-    "lsblk:Listing block devices"
-    "blkid:Getting partition UUIDs"
-  )
-  
-  for dep_info in "${deps[@]}"; do
-    local dep="${dep_info%%:*}"
-    local desc="${dep_info#*:}"
-    
-    if command -v "$dep" &>/dev/null; then
-      log_success "Found: $dep - $desc"
+detect_distribution() {
+    if [[ -f /etc/gentoo-release ]]; then
+        echo "gentoo"
+    elif [[ -f /etc/debian_version ]]; then
+        echo "debian"
+    elif [[ -f /etc/redhat-release ]]; then
+        if grep -qi "centos" /etc/redhat-release; then
+            echo "centos"
+        elif grep -qi "fedora" /etc/redhat-release; then
+            echo "fedora"
+        else
+            echo "rhel"
+        fi
+    elif [[ -f /etc/arch-release ]]; then
+        echo "arch"
+    elif [[ -f /etc/alpine-release ]]; then
+        echo "alpine"
     else
-      log_error "Missing: $dep"
-      log_error "  Purpose: $desc"
-      missing=1
+        echo "unknown"
     fi
-  done
+}
 
-  if [ $missing -eq 1 ]; then
-    show_error "Critical dependencies are missing!"
-    echo
-    echo "Please install the missing packages using your package manager:"
-    echo
-    echo "For Gentoo:"
-    echo "  emerge -av dialog parted curl wget tar util-linux"
-    echo
-    echo "For Ubuntu/Debian:"
-    echo "  apt install dialog parted curl wget tar util-linux"
-    echo
-    echo "For CentOS/RHEL/Fedora:"
-    echo "  yum install dialog parted curl wget tar util-linux"
-    echo "  or"
-    echo "  dnf install dialog parted curl wget tar util-linux"
-    echo
-    echo "For Arch Linux:"
-    echo "  pacman -S dialog parted curl wget tar util-linux"
-    echo
-    exit 1
-  fi
+get_install_command() {
+    local distro="$1"
+    case "$distro" in
+        gentoo) echo "emerge -av" ;;
+        debian|ubuntu) echo "apt install -y" ;;
+        centos|rhel) echo "yum install -y" ;;
+        fedora) echo "dnf install -y" ;;
+        arch) echo "pacman -S --noconfirm" ;;
+        alpine) echo "apk add" ;;
+        *) echo "" ;;
+    esac
+}
 
-  log_success "All dependencies are available"
-  echo
+get_package_name() {
+    local dep="$1"
+    local distro="$2"
+    
+    # Some packages have different names across distributions
+    case "$dep" in
+        lsblk|blkid)
+            case "$distro" in
+                gentoo) echo "util-linux" ;;
+                debian|ubuntu) echo "util-linux" ;;
+                centos|rhel|fedora) echo "util-linux" ;;
+                arch) echo "util-linux" ;;
+                alpine) echo "util-linux" ;;
+                *) echo "$dep" ;;
+            esac
+            ;;
+        *)
+            echo "$dep"
+            ;;
+    esac
+}
+
+check_dependencies() {
+    log_header "Checking Dependencies"
+    
+    local missing_deps=()
+    local critical_deps=("dialog" "parted" "curl" "wget" "tar" "lsblk" "blkid")
+    
+    # Check which dependencies are missing
+    for dep in "${critical_deps[@]}"; do
+        if ! command -v "$dep" &>/dev/null; then
+            missing_deps+=("$dep")
+        fi
+    done
+    
+    # Show status in TUI
+    if [[ ${#missing_deps[@]} -eq 0 ]]; then
+        show_success "All dependencies are available"
+        return 0
+    else
+        # Show missing dependencies in TUI
+        local missing_list=$(printf "%s, " "${missing_deps[@]}")
+        missing_list="${missing_list%, }"
+        show_error "Missing dependencies: $missing_list"
+        
+        # Detect distribution
+        local distro=$(detect_distribution)
+        local install_cmd=$(get_install_command "$distro")
+        
+        if [[ -n "$install_cmd" ]]; then
+            # Build package list for installation
+            local packages=()
+            for dep in "${missing_deps[@]}"; do
+                packages+=("$(get_package_name "$dep" "$distro")")
+            done
+            
+            # Remove duplicates
+            local unique_packages=($(echo "${packages[@]}" | tr ' ' '\n' | sort -u | tr '\n' ' '))
+            
+            show_info "Detected distribution: $distro"
+            show_info "Install command: $install_cmd ${unique_packages[*]}"
+            
+            if show_yesno "Would you like to install the missing dependencies automatically?"; then
+                log_info "Installing dependencies: ${unique_packages[*]}"
+                
+                # Execute the installation command
+                if $install_cmd "${unique_packages[@]}"; then
+                    log_success "Dependencies installed successfully"
+                    
+                    # Verify all dependencies are now available
+                    local still_missing=0
+                    for dep in "${missing_deps[@]}"; do
+                        if ! command -v "$dep" &>/dev/null; then
+                            log_error "Still missing: $dep"
+                            still_missing=1
+                        fi
+                    done
+                    
+                    if [[ $still_missing -eq 0 ]]; then
+                        show_success "All dependencies are now available"
+                        return 0
+                    else
+                        show_error "Some dependencies are still missing after installation"
+                        return 1
+                    fi
+                else
+                    show_error "Failed to install dependencies"
+                    return 1
+                fi
+            else
+                show_error "Cannot continue without required dependencies"
+                echo
+                echo "Please install the missing packages manually:"
+                echo "  $install_cmd ${unique_packages[*]}"
+                echo
+                return 1
+            fi
+        else
+            show_error "Unknown distribution - cannot provide installation commands"
+            echo
+            echo "Please install the following packages manually:"
+            printf "  %s\n" "${missing_deps[@]}"
+            echo
+            return 1
+        fi
+    fi
 }
 
 check_internet() {
@@ -90,44 +180,69 @@ check_internet() {
 }
 
 check_optional_deps() {
-  log_info "Checking optional dependencies..."
-  local optional_deps=(
-    "cryptsetup:LUKS encryption support"
-    "btrfs-progs:Btrfs filesystem support"
-    "zfs:ZFS filesystem support"
-    "mdadm:Software RAID support"
-  )
-  
-  local found_optional=0
-  for dep_info in "${optional_deps[@]}"; do
-    local dep="${dep_info%%:*}"
-    local desc="${dep_info#*:}"
+    log_info "Checking optional dependencies..."
+    local optional_deps=(
+        "cryptsetup:LUKS encryption support"
+        "btrfs-progs:Btrfs filesystem support"
+        "zfs:ZFS filesystem support"
+        "mdadm:Software RAID support"
+    )
     
-    if command -v "$dep" &>/dev/null; then
-      log_success "Optional: $dep - $desc"
-      found_optional=1
-    else
-      log_info "Missing optional: $dep - $desc"
+    local missing_optional=()
+    local found_optional=0
+    
+    for dep_info in "${optional_deps[@]}"; do
+        local dep="${dep_info%%:*}"
+        local desc="${dep_info#*:}"
+        
+        if command -v "$dep" &>/dev/null; then
+            log_success "Optional: $dep - $desc"
+            found_optional=1
+        else
+            log_info "Missing optional: $dep - $desc"
+            missing_optional+=("$dep:$desc")
+        fi
+    done
+    
+    # Show TUI message about optional dependencies
+    if [[ ${#missing_optional[@]} -gt 0 ]]; then
+        local missing_list=""
+        for item in "${missing_optional[@]}"; do
+            local dep="${item%%:*}"
+            local desc="${item#*:}"
+            missing_list+="• $dep: $desc\n"
+        done
+        
+        show_info "Some optional features are unavailable:\n\n$missing_list"
+        
+        # Offer to install optional dependencies
+        local distro=$(detect_distribution)
+        local install_cmd=$(get_install_command "$distro")
+        
+        if [[ -n "$install_cmd" && ${#missing_optional[@]} -gt 0 ]]; then
+            local optional_packages=()
+            for item in "${missing_optional[@]}"; do
+                local dep="${item%%:*}"
+                optional_packages+=("$(get_package_name "$dep" "$distro")")
+            done
+            
+            # Remove duplicates
+            local unique_optional=($(echo "${optional_packages[@]}" | tr ' ' '\n' | sort -u | tr '\n' ' '))
+            
+            if show_yesno "Would you like to install optional dependencies for enhanced features?"; then
+                log_info "Installing optional dependencies: ${unique_optional[*]}"
+                if $install_cmd "${unique_optional[@]}"; then
+                    show_success "Optional dependencies installed successfully"
+                else
+                    show_error "Failed to install some optional dependencies"
+                fi
+            fi
+        fi
     fi
-  done
-  
-  if [ $found_optional -eq 1 ]; then
-    log_success "Some optional features are available"
-    echo
-    echo "Note: To install optional dependencies:"
-    echo "  Gentoo: emerge -av cryptsetup btrfs-progs zfs mdadm"
-    echo "  Ubuntu/Debian: apt install cryptsetup btrfs-progs zfsutils-linux mdadm"
-    echo "  CentOS/RHEL/Fedora: yum/dnf install cryptsetup btrfs-progs zfs mdadm"
-    echo "  Arch Linux: pacman -S cryptsetup btrfs-progs zfs-linux mdadm"
-    echo
-  else
-    log_info "No optional dependencies found - some features will be unavailable"
-    echo
-    echo "To enable all features, install optional packages:"
-    echo "  Arch Linux: pacman -S cryptsetup btrfs-progs zfs-linux mdadm"
-    echo "  Other distros: see above commands"
-    echo
-  fi
+    
+    if [[ $found_optional -eq 1 ]]; then
+        log_success "Optional features are available"
+    fi
 }
 
 get_cpu_cores() { 
