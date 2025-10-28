@@ -22,7 +22,7 @@ check_root() {
 
 check_dependencies() {
   local missing=0
-  for dep in dialog parted sgdisk curl wget tar lsblk blkid; do
+  for dep in dialog parted curl wget tar lsblk blkid; do
     if ! command -v "$dep" &>/dev/null; then
       log_error "Missing: $dep"
       missing=1
@@ -30,6 +30,7 @@ check_dependencies() {
   done
 
   if [ $missing -eq 1 ]; then
+    show_error "Please install missing dependencies before continuing"
     exit 1
   fi
 

@@ -15,9 +15,16 @@ get_partition_name() {
 }
 
 wipe_disk() {
-    wipefs -af "${CONFIG[INSTALL_DISK]}" 2>/dev/null || true
-    sgdisk -Z "${CONFIG[INSTALL_DISK]}"
-    partprobe "${CONFIG[INSTALL_DISK]}" && sleep 2
+    show_info "Wiping disk ${CONFIG[INSTALL_DISK]}. ALL DATA WILL BE LOST!"
+    if show_yesno "Are you absolutely sure you want to wipe ${CONFIG[INSTALL_DISK]}?"; then
+        wipefs -af "${CONFIG[INSTALL_DISK]}" 2>/dev/null || true
+        parted -s "${CONFIG[INSTALL_DISK]}" mklabel gpt
+        partprobe "${CONFIG[INSTALL_DISK]}" && sleep 2
+        log_success "Disk wiped successfully"
+    else
+        log_error "Disk wipe cancelled"
+        return 1
+    fi
 }
 
 create_efi_partitions() {

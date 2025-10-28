@@ -110,15 +110,30 @@ install_base_system() {
     return 1
   fi
 
-  show_info "Installing base system..."
+  show_info "This will install the base Gentoo system. This may take some time."
+  if ! show_yesno "Continue with installation?"; then
+    return 1
+  fi
 
-  format_partitions || return 1
-  mount_filesystems || return 1
-  download_stage3 || return 1
-  extract_stage3 || return 1
-  configure_makeconf || return 1
-  generate_fstab || return 1
-  prepare_chroot || return 1
+  local steps=(
+    "Formatting partitions:format_partitions"
+    "Mounting filesystems:mount_filesystems" 
+    "Downloading stage3:download_stage3"
+    "Extracting stage3:extract_stage3"
+    "Configuring make.conf:configure_makeconf"
+    "Generating fstab:generate_fstab"
+    "Preparing chroot:prepare_chroot"
+  )
+  
+  for step in "${steps[@]}"; do
+    local desc="${step%:*}"
+    local func="${step#*:}"
+    show_info "Step: $desc"
+    if ! $func; then
+      show_error "Failed at: $desc"
+      return 1
+    fi
+  done
 
   show_success "Base system installed!"
 }
@@ -129,6 +144,12 @@ configure_system_menu() {
     return 1
   fi
 
+  show_info "This will enter the chroot environment to configure your system."
+  show_info "You will be prompted to set passwords and make configuration choices."
+  if ! show_yesno "Continue with system configuration?"; then
+    return 1
+  fi
+  
   generate_chroot_script || return 1
   enter_chroot || return 1
 }
@@ -159,12 +180,17 @@ install_bootloader_menu() {
 }
 
 finalize_installation() {
-  umount_all || show_error "Warning: Some unmounts failed"
-
-  show_success "Installation complete! You can now reboot."
-
-  if show_yesno "Reboot now?"; then
-    reboot
+  show_info "Finalizing installation..."
+  if show_yesno "Unmount all filesystems and complete installation?"; then
+    umount_all || show_error "Warning: Some unmounts failed"
+    show_success "Installation complete! You can now reboot."
+    
+    if show_yesno "Reboot now?"; then
+      reboot
+    fi
+  else
+    show_error "Finalization cancelled"
+    return 1
   fi
 }
 
