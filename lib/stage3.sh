@@ -12,22 +12,18 @@ download_stage3() {
     )
     
     local download_url=""
-    local latest=""
+    local stage3_filename=""
     
     for mirror in "${mirrors[@]}"; do
         log_info "Trying mirror: $mirror"
         
         local latest_url="${mirror}/latest-stage3-amd64-${variant}.txt"
-        log_info "Fetching: $latest_url"
+        log_info "Fetching latest stage3 info from: $latest_url"
         
-        # Use curl with verbose output for debugging
+        # Get the latest stage3 information file
         local latest_content
         if command -v curl &>/dev/null; then
-            # Add verbose output for debugging
-            latest_content=$(curl -f -L --connect-timeout 20 --max-time 30 -v "$latest_url" 2>&1 | grep -E "(stage3.*${variant}|HTTP/)" || echo "")
-            if [[ $? -ne 0 ]]; then
-                latest_content=$(curl -f -L --connect-timeout 20 --max-time 30 "$latest_url" 2>/dev/null || echo "")
-            fi
+            latest_content=$(curl -f -L --connect-timeout 20 --max-time 30 "$latest_url" 2>/dev/null || echo "")
         elif command -v wget &>/dev/null; then
             latest_content=$(wget --timeout=30 -q -O - "$latest_url" 2>/dev/null || echo "")
         else
@@ -36,23 +32,29 @@ download_stage3() {
         fi
         
         if [[ -n "$latest_content" ]]; then
-            # Better parsing - look for stage3 files
-            latest=$(echo "$latest_content" | grep -oE "stage3-amd64-${variant}-[0-9]{8}T[0-9]{6}Z.tar.xz" | head -n1)
-            if [[ -z "$latest" ]]; then
-                # Alternative parsing method
-                latest=$(echo "$latest_content" | grep -v "^#" | grep "stage3.*${variant}" | awk '{print $1}' | head -n1)
-            fi
-            
-            if [[ -n "$latest" ]]; then
-                download_url="${mirror}/${latest}"
-                log_success "Found stage3: $latest"
+            log_info "Successfully fetched latest stage3 info"
+            # Debug: show first few lines of content
+            log_info "First few lines of response:"
+            echo "$latest_content" | head -n 3 | while read line; do
+                log_info "  $line"
+            done
+        
+            # Parse the latest stage3 filename from the content
+            # The format is: timestamp stage3-filename size hash
+            # We want the first field (filename)
+            stage3_filename=$(echo "$latest_content" | grep -v "^#" | grep "stage3-amd64-${variant}" | awk '{print $1}' | head -n1)
+        
+            if [[ -n "$stage3_filename" ]]; then
+                download_url="${mirror}/${stage3_filename}"
+                log_success "Found latest stage3: $stage3_filename"
                 break
             else
-                log_info "Could not parse stage3 filename from mirror response"
-                log_info "Trying raw URL construction..."
-                # Try to construct URL directly
-                latest="latest-stage3-amd64-${variant}.txt"
-                download_url="${mirror}/${latest}"
+                log_error "Could not parse stage3 filename from mirror response"
+                log_error "Looking for pattern: stage3-amd64-${variant}"
+                log_error "Available stage3 files in response:"
+                echo "$latest_content" | grep "stage3-amd64" | head -n 5 | while read line; do
+                    log_error "  $line"
+                done
             fi
         else
             log_info "No response from mirror: $mirror"
@@ -61,9 +63,10 @@ download_stage3() {
     
     if [[ -z "$download_url" ]]; then
         show_error "Failed to find stage3 from any mirror"
-        log_error "Network debug info:"
-        log_error "  DNS servers: $(cat /etc/resolv.conf 2>/dev/null | grep nameserver || echo 'none')"
-        log_error "  IP route: $(ip route get 8.8.8.8 2>/dev/null || echo 'no route')"
+        log_error "Please check:"
+        log_error "  - Internet connection"
+        log_error "  - Gentoo mirror availability"
+        log_error "  - The variant '${variant}' exists"
         return 1
     fi
     
@@ -155,8 +158,15 @@ download_stage3_manual() {
     show_info "Automatic stage3 download failed."
     show_info "You can manually provide a stage3 URL."
     
+    # Show example URLs based on the selected init system
+    local variant=$([[ "${CONFIG[INIT_SYSTEM]}" == "systemd" ]] && echo "systemd" || echo "openrc")
+    local example_url="https://distfiles.gentoo.org/releases/amd64/autobuilds/latest-stage3-amd64-${variant}.txt"
+    
+    show_info "Example: Visit $example_url to find the latest URL"
+    show_info "Format should be: https://distfiles.gentoo.org/releases/amd64/autobuilds/YYYYMMDDTHHMMSSZ/stage3-amd64-${variant}-YYYYMMDDTHHMMSSZ.tar.xz"
+    
     local manual_url
-    manual_url=$(show_input "Enter stage3 URL:" "https://distfiles.gentoo.org/releases/amd64/autobuilds/")
+    manual_url=$(show_input "Enter stage3 URL:" "")
     
     if [[ -z "$manual_url" ]]; then
         log_error "No URL provided"
