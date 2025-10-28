@@ -47,7 +47,18 @@ load_config() {
         log_success "Configuration loaded"
         return 0
     else
-        log_info "No saved configuration found"
+        log_info "No saved configuration found. Using defaults."
+        # Set default values when no config exists
+        CONFIG[INIT_SYSTEM]="${CONFIG_INIT_SYSTEM:-}"
+        CONFIG[BOOT_MODE]="${CONFIG_BOOT_MODE:-}"
+        CONFIG[HOSTNAME]="${CONFIG_HOSTNAME:-${DEFAULT_HOSTNAME:-gentoo}}"
+        CONFIG[USERNAME]="${CONFIG_USERNAME:-${DEFAULT_USERNAME:-user}}"
+        CONFIG[TIMEZONE]="${CONFIG_TIMEZONE:-${DEFAULT_TIMEZONE:-UTC}}"
+        CONFIG[INSTALL_DISK]="${CONFIG_INSTALL_DISK:-}"
+        CONFIG[FILESYSTEM]="${CONFIG_FILESYSTEM:-}"
+        CONFIG[USE_ENCRYPTION]="${CONFIG_USE_ENCRYPTION:-no}"
+        CONFIG[MOUNT_POINT]="${CONFIG_MOUNT_POINT:-/mnt/gentoo}"
+        
         return 1
     fi
 }
