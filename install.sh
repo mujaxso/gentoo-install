@@ -489,8 +489,8 @@ main_menu() {
 main() {
   check_root || exit 1
   
-  # Load saved configuration
-  load_config
+  # Load saved configuration (returns 1 when no config exists, which is normal)
+  load_config || true
   
   # Check dependencies with automatic installation option
   if ! check_dependencies; then
