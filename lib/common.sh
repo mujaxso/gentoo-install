@@ -14,18 +14,30 @@ log_success() { echo -e "${CYAN}[✓]${NC} $*"; }
 log_header() { echo -e "\n${BOLD}═══ $* ═══${NC}\n"; }
 
 check_root() {
-    [ "$(id -u)" -ne 0 ] && log_error "Must run as root" && exit 1
+  if [ "$(id -u)" -ne 0 ]; then
+    log_error "Must run as root"
+    exit 1
+  fi
 }
 
 check_dependencies() {
-    for dep in dialog parted sgdisk curl wget tar lsblk blkid; do
-        command -v "$dep" &>/dev/null || { log_error "Missing: $dep"; exit 1; }
-    done
-    log_success "Dependencies OK"
+  local missing=0
+  for dep in dialog parted sgdisk curl wget tar lsblk blkid; do
+    if ! command -v "$dep" &>/dev/null; then
+      log_error "Missing: $dep"
+      missing=1
+    fi
+  done
+
+  if [ $missing -eq 1 ]; then
+    exit 1
+  fi
+
+  log_success "Dependencies OK"
 }
 
 check_internet() {
-    ping -c 1 -W 2 gentoo.org &>/dev/null
+  ping -c 1 -W 2 gentoo.org &>/dev/null
 }
 
 get_cpu_cores() { nproc; }
@@ -33,15 +45,16 @@ get_memory_gb() { free -g | awk '/^Mem:/{print $2}'; }
 get_uuid() { blkid -s UUID -o value "$1" 2>/dev/null || echo ""; }
 
 show_banner() {
-    clear
-    cat << "EOF"
+  clear
+  cat <<"EOF"
 ╔══════════════════════════════════════════════════════════════╗
 ║   ██████╗ ███████╗███╗   ██╗████████╗ ██████╗  ██████╗     ║
 ║  ██╔════╝ ██╔════╝████╗  ██║╚══██╔══╝██╔═══██╗██╔═══██╗    ║
 ║  ██║  ███╗█████╗  ██╔██╗ ██║   ██║   ██║   ██║██║   ██║    ║
+║  ██║   ██║██║     ██║╚██╗██║   ██║   ██║   ██║██║   ██║    ║
 ║  ╚██████╔╝███████╗██║ ╚████║   ██║   ╚██████╔╝╚██████╔╝    ║
 ║          Modular Installer v2.0 - Mujahid Siyam            ║
 ╚══════════════════════════════════════════════════════════════╝
 EOF
-    sleep 1
+  sleep 1
 }
