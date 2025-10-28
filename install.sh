@@ -134,27 +134,44 @@ install_base_system() {
         return 1
     fi
 
-    local steps=(
-        "Formatting partitions:format_partitions"
-        "Mounting filesystems:mount_filesystems" 
-        "Downloading stage3:download_stage3"
+    # Format and mount first
+    if ! format_partitions; then
+        show_error "Failed to format partitions"
+        return 1
+    fi
+    
+    if ! mount_filesystems; then
+        show_error "Failed to mount filesystems"
+        return 1
+    fi
+    
+    # Try automatic download first, then fallback to manual
+    if ! download_stage3; then
+        show_error "Automatic stage3 download failed"
+        if show_yesno "Would you like to manually specify a stage3 URL?"; then
+            if ! download_stage3_manual; then
+                show_error "Manual download also failed"
+                return 1
+            fi
+        else
+            return 1
+        fi
+    fi
+    
+    # Continue with remaining steps
+    local remaining_steps=(
         "Extracting stage3:extract_stage3"
         "Configuring make.conf:configure_makeconf"
         "Generating fstab:generate_fstab"
         "Preparing chroot:prepare_chroot"
     )
     
-    for step in "${steps[@]}"; do
+    for step in "${remaining_steps[@]}"; do
         local desc="${step%:*}"
         local func="${step#*:}"
         show_info "Step: $desc"
         if ! $func; then
             show_error "Failed at: $desc"
-            log_error "Check the following:"
-            log_error "  - Internet connection"
-            log_error "  - Disk space availability"
-            log_error "  - Disk permissions"
-            log_error "  - Gentoo mirror availability"
             return 1
         fi
     done

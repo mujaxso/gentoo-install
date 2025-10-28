@@ -164,19 +164,36 @@ check_dependencies() {
 }
 
 check_internet() {
-  log_info "Checking internet connectivity..."
-  if ping -c 1 -W 2 gentoo.org &>/dev/null; then
-    log_success "Internet connection is available"
+    log_info "Checking internet connectivity..."
+    
+    # Test basic connectivity
+    if ! ping -c 1 -W 2 gentoo.org &>/dev/null; then
+        log_error "Basic connectivity test failed"
+        show_error "Cannot reach gentoo.org - check network connection"
+        return 1
+    fi
+    
+    # Test DNS resolution
+    if ! nslookup gentoo.org &>/dev/null 2>&1; then
+        log_error "DNS resolution test failed"
+        show_error "DNS resolution issue - check /etc/resolv.conf"
+        return 1
+    fi
+    
+    # Test Gentoo mirror connectivity
+    if ! test_gentoo_mirrors; then
+        show_error "Some Gentoo mirrors are unreachable"
+        # Don't fail here, as some mirrors might be down
+    fi
+    
+    # Test HTTP download capability
+    if ! test_http_download; then
+        show_error "HTTP download test failed - firewalls or proxies may be blocking"
+        # Continue anyway, as user might use manual download
+    fi
+    
+    log_success "Internet connectivity tests passed"
     return 0
-  else
-    log_error "No internet connection detected"
-    show_error "Internet connection is required for downloading stage3 and packages"
-    echo
-    echo "Please ensure you have a working internet connection and try again."
-    echo "You can check your connection with: ping -c 3 gentoo.org"
-    echo
-    return 1
-  fi
 }
 
 check_optional_deps() {
