@@ -56,16 +56,33 @@ CONFIG[TIMEZONE]="${CONFIG[TIMEZONE]:-${DEFAULT_TIMEZONE:-UTC}}"
 
 system_configuration_menu() {
     log_header "SYSTEM CONFIGURATION"
-    local init=$(show_menu "Init System" "1" "OpenRC" "2" "systemd")
-    CONFIG[INIT_SYSTEM]=$([[ $init == "1" ]] && echo "openrc" || echo "systemd")
+    
+    # Offer to load existing config
+    if [[ -n "${CONFIG[INIT_SYSTEM]}" && -n "${CONFIG[BOOT_MODE]}" ]]; then
+        show_config_summary
+        if ! show_yesno "Use current configuration?"; then
+            # Reset configuration if user wants to change it
+            CONFIG[INIT_SYSTEM]=""
+            CONFIG[BOOT_MODE]=""
+        fi
+    fi
+    
+    if [[ -z "${CONFIG[INIT_SYSTEM]}" ]]; then
+        local init=$(show_menu "Init System" "1" "OpenRC" "2" "systemd")
+        CONFIG[INIT_SYSTEM]=$([[ $init == "1" ]] && echo "openrc" || echo "systemd")
+    fi
 
-    local boot=$(show_menu "Boot Mode" "1" "EFI" "2" "BIOS")
-    CONFIG[BOOT_MODE]=$([[ $boot == "1" ]] && echo "efi" || echo "bios")
+    if [[ -z "${CONFIG[BOOT_MODE]}" ]]; then
+        local boot=$(show_menu "Boot Mode" "1" "EFI" "2" "BIOS")
+        CONFIG[BOOT_MODE]=$([[ $boot == "1" ]] && echo "efi" || echo "bios")
+    fi
 
     CONFIG[HOSTNAME]=$(show_input "Hostname:" "${CONFIG[HOSTNAME]}")
     CONFIG[USERNAME]=$(show_input "Username:" "${CONFIG[USERNAME]}")
     CONFIG[TIMEZONE]=$(show_input "Timezone:" "${CONFIG[TIMEZONE]}")
 
+    # Save configuration
+    save_config
     show_success "Configuration saved"
     return 0
 }
@@ -78,24 +95,56 @@ disk_configuration_menu() {
     fi
 
     log_header "DISK CONFIGURATION"
+    
+    # Show current disk configuration if available
+    if [[ -n "${CONFIG[FILESYSTEM]}" && -n "${CONFIG[INSTALL_DISK]}" ]]; then
+        local disk_summary="Current Disk Configuration:\n\n"
+        disk_summary+="  Filesystem: ${CONFIG[FILESYSTEM]}\n"
+        disk_summary+="  Install Disk: ${CONFIG[INSTALL_DISK]}\n"
+        disk_summary+="  Encryption: ${CONFIG[USE_ENCRYPTION]}\n\n"
+        disk_summary+="Do you want to use this configuration?"
+        
+        if show_yesno "$disk_summary"; then
+            # Check if the disk still exists
+            if [[ -b "${CONFIG[INSTALL_DISK]}" ]]; then
+                log_success "Using existing disk configuration"
+                return 0
+            else
+                show_error "Previously configured disk ${CONFIG[INSTALL_DISK]} not found!"
+                CONFIG[INSTALL_DISK]=""
+            fi
+        else
+            # Reset disk configuration
+            CONFIG[FILESYSTEM]=""
+            CONFIG[INSTALL_DISK]=""
+            CONFIG[USE_ENCRYPTION]="no"
+        fi
+    fi
 
-    local fs=$(show_menu "Filesystem" "1" "ext4" "2" "btrfs" "3" "zfs")
-    case $fs in
-    1) CONFIG[FILESYSTEM]="ext4" ;;
-    2) CONFIG[FILESYSTEM]="btrfs" ;;
-    3) CONFIG[FILESYSTEM]="zfs" ;;
-    esac
+    if [[ -z "${CONFIG[FILESYSTEM]}" ]]; then
+        local fs=$(show_menu "Filesystem" "1" "ext4" "2" "btrfs" "3" "zfs")
+        case $fs in
+        1) CONFIG[FILESYSTEM]="ext4" ;;
+        2) CONFIG[FILESYSTEM]="btrfs" ;;
+        3) CONFIG[FILESYSTEM]="zfs" ;;
+        esac
+    fi
 
-    show_yesno "Enable LUKS encryption?" && CONFIG[USE_ENCRYPTION]="yes" || CONFIG[USE_ENCRYPTION]="no"
+    if [[ -z "${CONFIG[USE_ENCRYPTION]}" ]]; then
+        show_yesno "Enable LUKS encryption?" && CONFIG[USE_ENCRYPTION]="yes" || CONFIG[USE_ENCRYPTION]="no"
+    fi
 
-    if ! select_target_disk; then
-        return 1
+    if [[ -z "${CONFIG[INSTALL_DISK]}" ]]; then
+        if ! select_target_disk; then
+            return 1
+        fi
     fi
 
     # Check if we're trying to use the root disk
     local root_disk=$(mount | grep ' / ' | cut -d' ' -f1 | sed 's/[0-9]*$//')
     if [[ "${CONFIG[INSTALL_DISK]}" == "$root_disk" ]]; then
         show_error "Cannot use the root disk for installation!"
+        CONFIG[INSTALL_DISK]=""
         return 1
     fi
 
@@ -119,6 +168,8 @@ disk_configuration_menu() {
         fi
     fi
     
+    # Save configuration
+    save_config
     return 0
 }
 
@@ -323,6 +374,20 @@ finalize_installation() {
 main_menu() {
     local current_step=1
     
+    # Determine current step based on configuration
+    if [[ -n "${CONFIG[INIT_SYSTEM]}" && -n "${CONFIG[BOOT_MODE]}" ]]; then
+        current_step=2
+    fi
+    if [[ -n "${CONFIG[FILESYSTEM]}" && -n "${CONFIG[INSTALL_DISK]}" ]]; then
+        current_step=3
+    fi
+    if [[ -d "${CONFIG[MOUNT_POINT]}/root" ]]; then
+        current_step=4
+    fi
+    if [[ -f "${CONFIG[MOUNT_POINT]}/boot/grub/grub.cfg" ]]; then
+        current_step=6
+    fi
+    
     while true; do
         # Build menu items with completion status
         local menu_items=()
@@ -333,10 +398,11 @@ main_menu() {
             "Configure System"
             "Install Bootloader"
             "Finalize & Reboot"
+            "Configuration Management"
             "Exit"
         )
         
-        for i in {1..7}; do
+        for i in {1..8}; do
             local status=""
             if [[ $i -lt $current_step ]]; then
                 status=" ✓"
@@ -400,6 +466,17 @@ main_menu() {
             fi
             ;;
         7)
+            local config_choice=$(show_menu "Configuration Management" \
+                "1" "Show Current Configuration" \
+                "2" "Clear Saved Configuration" \
+                "3" "Back to Main Menu")
+            case $config_choice in
+            1) show_config_summary ;;
+            2) clear_config ;;
+            3) ;;
+            esac
+            ;;
+        8)
             if show_yesno "Exit installer?"; then
                 exit 0
             fi
@@ -411,6 +488,9 @@ main_menu() {
 
 main() {
   check_root || exit 1
+  
+  # Load saved configuration
+  load_config
   
   # Check dependencies with automatic installation option
   if ! check_dependencies; then
@@ -428,6 +508,11 @@ main() {
   fi
 
   show_info "Welcome to Gentoo Installer v2.0 by Mujahid Siyam"
+  
+  # Show loaded configuration if available
+  if [[ -n "${CONFIG[INIT_SYSTEM]}" || -n "${CONFIG[INSTALL_DISK]}" ]]; then
+      show_info "Loaded previous configuration. Use 'Configuration Management' to view or clear it."
+  fi
 
   main_menu
 }

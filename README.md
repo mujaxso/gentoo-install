@@ -144,6 +144,8 @@ gentoo-installer-v2/
 ## 🔧 Customization
 
 ### Configuration Files
+
+#### Default Configuration
 Edit `config/default.conf` to set default values:
 ```bash
 # Default system configuration
@@ -152,6 +154,14 @@ DEFAULT_USERNAME="user"
 DEFAULT_TIMEZONE="UTC"
 GENTOO_MIRROR="https://distfiles.gentoo.org"
 ```
+
+#### User Configuration Persistence
+The installer automatically saves your configuration to `config/installer.conf` after each step. This allows you to:
+- Resume interrupted installations
+- Reuse configuration across multiple sessions
+- Skip re-entering information on subsequent runs
+
+You can manage saved configurations through the "Configuration Management" menu option.
 
 ### Adding Modules
 Extend functionality by creating new modules in the appropriate subdirectories:
