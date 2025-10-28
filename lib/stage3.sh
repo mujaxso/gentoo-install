@@ -23,7 +23,11 @@ download_stage3() {
         # Use curl with verbose output for debugging
         local latest_content
         if command -v curl &>/dev/null; then
-            latest_content=$(curl -f -L --connect-timeout 20 --max-time 30 "$latest_url" 2>/dev/null || echo "")
+            # Add verbose output for debugging
+            latest_content=$(curl -f -L --connect-timeout 20 --max-time 30 -v "$latest_url" 2>&1 | grep -E "(stage3.*${variant}|HTTP/)" || echo "")
+            if [[ $? -ne 0 ]]; then
+                latest_content=$(curl -f -L --connect-timeout 20 --max-time 30 "$latest_url" 2>/dev/null || echo "")
+            fi
         elif command -v wget &>/dev/null; then
             latest_content=$(wget --timeout=30 -q -O - "$latest_url" 2>/dev/null || echo "")
         else
@@ -32,15 +36,23 @@ download_stage3() {
         fi
         
         if [[ -n "$latest_content" ]]; then
-            # Better parsing - look for lines that start with stage3
-            latest=$(echo "$latest_content" | grep -E "^[^#].*stage3.*${variant}.*\.tar\.xz" | awk '{print $1}' | head -n1)
+            # Better parsing - look for stage3 files
+            latest=$(echo "$latest_content" | grep -oE "stage3-amd64-${variant}-[0-9]{8}T[0-9]{6}Z.tar.xz" | head -n1)
+            if [[ -z "$latest" ]]; then
+                # Alternative parsing method
+                latest=$(echo "$latest_content" | grep -v "^#" | grep "stage3.*${variant}" | awk '{print $1}' | head -n1)
+            fi
+            
             if [[ -n "$latest" ]]; then
                 download_url="${mirror}/${latest}"
                 log_success "Found stage3: $latest"
                 break
             else
                 log_info "Could not parse stage3 filename from mirror response"
-                log_info "Response preview: $(echo "$latest_content" | head -n 5)"
+                log_info "Trying raw URL construction..."
+                # Try to construct URL directly
+                latest="latest-stage3-amd64-${variant}.txt"
+                download_url="${mirror}/${latest}"
             fi
         else
             log_info "No response from mirror: $mirror"
@@ -49,11 +61,9 @@ download_stage3() {
     
     if [[ -z "$download_url" ]]; then
         show_error "Failed to find stage3 from any mirror"
-        log_error "Please check:"
-        log_error "  - Internet connection"
-        log_error "  - Firewall settings"
-        log_error "  - DNS resolution"
-        log_error "  - Try accessing https://distfiles.gentoo.org/releases/amd64/autobuilds/ manually"
+        log_error "Network debug info:"
+        log_error "  DNS servers: $(cat /etc/resolv.conf 2>/dev/null | grep nameserver || echo 'none')"
+        log_error "  IP route: $(ip route get 8.8.8.8 2>/dev/null || echo 'no route')"
         return 1
     fi
     

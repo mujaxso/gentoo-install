@@ -166,18 +166,85 @@ check_dependencies() {
 check_internet() {
     log_info "Checking internet connectivity..."
     
-    # Test basic connectivity
-    if ! ping -c 1 -W 2 gentoo.org &>/dev/null; then
-        log_error "Basic connectivity test failed"
-        show_error "Cannot reach gentoo.org - check network connection"
+    # Test basic connectivity with multiple hosts
+    local test_hosts=("gentoo.org" "google.com" "8.8.8.8")
+    local connectivity_ok=0
+    
+    for host in "${test_hosts[@]}"; do
+        if ping -c 1 -W 3 "$host" &>/dev/null; then
+            log_success "Reachable: $host"
+            connectivity_ok=1
+            break
+        else
+            log_info "Unreachable: $host"
+        fi
+    done
+    
+    if [[ $connectivity_ok -eq 0 ]]; then
+        show_error "Basic connectivity test failed"
+        log_error "Cannot reach any test hosts - check network connection"
         return 1
     fi
     
-    # Test DNS resolution
-    if ! nslookup gentoo.org &>/dev/null 2>&1; then
-        log_error "DNS resolution test failed"
+    # Test DNS resolution with multiple methods
+    local dns_ok=0
+    
+    # Method 1: Using getent (most reliable)
+    if command -v getent &>/dev/null; then
+        if getent hosts gentoo.org &>/dev/null; then
+            log_success "DNS resolution (getent): working"
+            dns_ok=1
+        fi
+    fi
+    
+    # Method 2: Using nslookup
+    if [[ $dns_ok -eq 0 ]] && command -v nslookup &>/dev/null; then
+        if nslookup gentoo.org &>/dev/null 2>&1; then
+            log_success "DNS resolution (nslookup): working"
+            dns_ok=1
+        fi
+    fi
+    
+    # Method 3: Using host
+    if [[ $dns_ok -eq 0 ]] && command -v host &>/dev/null; then
+        if host gentoo.org &>/dev/null 2>&1; then
+            log_success "DNS resolution (host): working"
+            dns_ok=1
+        fi
+    fi
+    
+    # Method 4: Using dig
+    if [[ $dns_ok -eq 0 ]] && command -v dig &>/dev/null; then
+        if dig gentoo.org +short &>/dev/null 2>&1; then
+            log_success "DNS resolution (dig): working"
+            dns_ok=1
+        fi
+    fi
+    
+    if [[ $dns_ok -eq 0 ]]; then
+        log_error "DNS resolution test failed with all methods"
         show_error "DNS resolution issue - check /etc/resolv.conf"
-        return 1
+        log_info "Current /etc/resolv.conf:"
+        cat /etc/resolv.conf 2>/dev/null || log_error "Cannot read /etc/resolv.conf"
+        
+        # Try to fix resolv.conf if it's empty or missing
+        if [[ ! -f /etc/resolv.conf ]] || [[ ! -s /etc/resolv.conf ]]; then
+            log_info "Attempting to fix /etc/resolv.conf..."
+            echo "nameserver 8.8.8.8" > /etc/resolv.conf
+            echo "nameserver 1.1.1.1" >> /etc/resolv.conf
+            log_success "Created /etc/resolv.conf with public DNS servers"
+            
+            # Retest DNS
+            if getent hosts gentoo.org &>/dev/null; then
+                log_success "DNS resolution now working after fix"
+                dns_ok=1
+            fi
+        fi
+        
+        if [[ $dns_ok -eq 0 ]]; then
+            show_error "DNS resolution failed. Continuing anyway, but downloads may fail."
+            # Don't return 1 here - let user try manual download
+        fi
     fi
     
     # Test Gentoo mirror connectivity
@@ -192,7 +259,7 @@ check_internet() {
         # Continue anyway, as user might use manual download
     fi
     
-    log_success "Internet connectivity tests passed"
+    log_success "Internet connectivity tests completed"
     return 0
 }
 
