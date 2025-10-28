@@ -11,6 +11,7 @@ Complete modular installer for Gentoo Linux with TUI interface.
 - LUKS encryption
 - mdraid support
 - Fully modular architecture
+- Multi-distro dependency support (Gentoo, Ubuntu/Debian, CentOS/RHEL/Fedora, Arch Linux)
 
 ## Usage
 ```bash

@@ -4,11 +4,23 @@ download_stage3() {
     cd "$mp"
     local variant=$([[ "${CONFIG[INIT_SYSTEM]}" == "systemd" ]] && echo "systemd" || echo "openrc")
     local mirror="https://distfiles.gentoo.org/releases/amd64/autobuilds"
+    
+    log_info "Fetching latest stage3 URL for ${variant}..."
     local latest=$(curl -s "${mirror}/latest-stage3-amd64-${variant}.txt" | grep -v "^#" | awk '{print $1}' | head -n1)
+    
+    if [[ -z "$latest" ]]; then
+        log_error "Failed to find latest stage3 URL"
+        return 1
+    fi
+    
     log_info "Downloading: $latest"
-    wget -q --show-progress "${mirror}/${latest}" || return 1
+    if ! wget -q --show-progress "${mirror}/${latest}"; then
+        log_error "Failed to download stage3"
+        return 1
+    fi
+    
     CONFIG[STAGE3_FILE]="$mp/$(basename "$latest")"
-    log_success "Downloaded"
+    log_success "Downloaded stage3 successfully"
 }
 
 extract_stage3() {

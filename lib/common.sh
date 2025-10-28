@@ -63,6 +63,9 @@ check_dependencies() {
     echo "  or"
     echo "  dnf install dialog parted curl wget tar util-linux"
     echo
+    echo "For Arch Linux:"
+    echo "  pacman -S dialog parted curl wget tar util-linux"
+    echo
     exit 1
   fi
 
@@ -110,10 +113,21 @@ check_optional_deps() {
   
   if [ $found_optional -eq 1 ]; then
     log_success "Some optional features are available"
+    echo
+    echo "Note: To install optional dependencies:"
+    echo "  Gentoo: emerge -av cryptsetup btrfs-progs zfs mdadm"
+    echo "  Ubuntu/Debian: apt install cryptsetup btrfs-progs zfsutils-linux mdadm"
+    echo "  CentOS/RHEL/Fedora: yum/dnf install cryptsetup btrfs-progs zfs mdadm"
+    echo "  Arch Linux: pacman -S cryptsetup btrfs-progs zfs-linux mdadm"
+    echo
   else
     log_info "No optional dependencies found - some features will be unavailable"
+    echo
+    echo "To enable all features, install optional packages:"
+    echo "  Arch Linux: pacman -S cryptsetup btrfs-progs zfs-linux mdadm"
+    echo "  Other distros: see above commands"
+    echo
   fi
-  echo
 }
 
 get_cpu_cores() { 
