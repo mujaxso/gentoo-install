@@ -33,15 +33,14 @@ source_lib() {
 
 # Source all library files with validation
 echo "Loading library files..."
-source_lib "${LIB_DIR}/common.sh"
-source_lib "${LIB_DIR}/ui.sh"
-source_lib "${LIB_DIR}/disk.sh"
-source_lib "${LIB_DIR}/filesystem.sh"
-source_lib "${LIB_DIR}/config.sh"
-source_lib "${LIB_DIR}/network.sh"
-source_lib "${LIB_DIR}/stage3.sh"
-source_lib "${LIB_DIR}/chroot.sh"
-source_lib "${LIB_DIR}/bootloader.sh"
+for lib in "common.sh" "ui.sh" "disk.sh" "filesystem.sh" "config.sh" "network.sh" "stage3.sh" "chroot.sh" "bootloader.sh"; do
+    source_lib "${LIB_DIR}/${lib}"
+done
+
+# Load default configuration
+if [[ -f "${SCRIPT_DIR}/config/default.conf" ]]; then
+    source "${SCRIPT_DIR}/config/default.conf"
+fi
 
 # Initialize configuration with default values
 declare -A CONFIG
@@ -51,9 +50,9 @@ CONFIG[INIT_SYSTEM]="${CONFIG[INIT_SYSTEM]:-}"
 CONFIG[BOOT_MODE]="${CONFIG[BOOT_MODE]:-}"
 CONFIG[FILESYSTEM]="${CONFIG[FILESYSTEM]:-}"
 CONFIG[USE_ENCRYPTION]="${CONFIG[USE_ENCRYPTION]:-no}"
-CONFIG[HOSTNAME]="${CONFIG[HOSTNAME]:-gentoo}"
-CONFIG[USERNAME]="${CONFIG[USERNAME]:-user}"
-CONFIG[TIMEZONE]="${CONFIG[TIMEZONE]:-UTC}"
+CONFIG[HOSTNAME]="${CONFIG[HOSTNAME]:-${DEFAULT_HOSTNAME:-gentoo}}"
+CONFIG[USERNAME]="${CONFIG[USERNAME]:-${DEFAULT_USERNAME:-user}}"
+CONFIG[TIMEZONE]="${CONFIG[TIMEZONE]:-${DEFAULT_TIMEZONE:-UTC}}"
 
 system_configuration_menu() {
   log_header "SYSTEM CONFIGURATION"
@@ -92,11 +91,16 @@ disk_configuration_menu() {
   fi
 
   if [[ "${CONFIG[USE_ENCRYPTION]}" == "yes" ]]; then
-    source_lib "${MODULE_DIR}/fs/luks.sh"
-    setup_luks_encryption || {
-      show_error "Encryption setup failed!"
-      return 1
-    }
+    if [[ -f "${MODULE_DIR}/fs/luks.sh" ]]; then
+        source "${MODULE_DIR}/fs/luks.sh"
+        setup_luks_encryption || {
+            show_error "Encryption setup failed!"
+            return 1
+        }
+    else
+        show_error "LUKS module not found!"
+        return 1
+    fi
   fi
 }
 
@@ -136,11 +140,21 @@ install_bootloader_menu() {
   fi
 
   if [[ "${CONFIG[BOOT_MODE]}" == "efi" ]]; then
-    source_lib "${MODULE_DIR}/boot/efi.sh"
-    install_efi_bootloader || return 1
+    if [[ -f "${MODULE_DIR}/boot/efi.sh" ]]; then
+        source "${MODULE_DIR}/boot/efi.sh"
+        install_efi_bootloader || return 1
+    else
+        show_error "EFI bootloader module not found!"
+        return 1
+    fi
   else
-    source_lib "${MODULE_DIR}/boot/bios.sh"
-    install_bios_bootloader || return 1
+    if [[ -f "${MODULE_DIR}/boot/bios.sh" ]]; then
+        source "${MODULE_DIR}/boot/bios.sh"
+        install_bios_bootloader || return 1
+    else
+        show_error "BIOS bootloader module not found!"
+        return 1
+    fi
   fi
 }
 
