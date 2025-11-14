@@ -1,4 +1,4 @@
-.PHONY: all install clean check-deps
+.PHONY: all install clean check-deps make-executable setup
 
 # Gentoo Installer Makefile
 
@@ -26,11 +26,30 @@ check-deps:
 	@command -v zfs >/dev/null 2>&1 || (echo "WARNING: zfs is not installed" || true)
 	@echo "Dependency check completed."
 
-# Make installer executable
+# Make installer and all modules executable
 make-executable:
-	@chmod +x gentoo-installer.sh
-	@chmod +x modules/*.sh
-	@echo "Made installer executable."
+	@echo "Making all scripts executable..."
+	@chmod +x gentoo-installer.sh 2>/dev/null || echo "Warning: gentoo-installer.sh not found"
+	@chmod +x modules/install.sh 2>/dev/null || echo "Warning: modules/install.sh not found"
+	@chmod +x modules/encryption.sh 2>/dev/null || echo "Warning: modules/encryption.sh not found"
+	@chmod +x modules/disk.sh 2>/dev/null || echo "Warning: modules/disk.sh not found"
+	@chmod +x modules/stage.sh 2>/dev/null || echo "Warning: modules/stage.sh not found"
+	@chmod +x modules/config.sh 2>/dev/null || echo "Warning: modules/config.sh not found"
+	@chmod +x modules/kernel.sh 2>/dev/null || echo "Warning: modules/kernel.sh not found"
+	@chmod +x modules/portage.sh 2>/dev/null || echo "Warning: modules/portage.sh not found"
+	@chmod +x modules/filesystem.sh 2>/dev/null || echo "Warning: modules/filesystem.sh not found"
+	@chmod +x modules/bootloader.sh 2>/dev/null || echo "Warning: modules/bootloader.sh not found"
+	@chmod +x modules/finalize.sh 2>/dev/null || echo "Warning: modules/finalize.sh not found"
+	@chmod +x Makefile 2>/dev/null || echo "Warning: Makefile permission issue"
+	@echo "Made all installer scripts executable."
+
+# Make all scripts executable (alternative target)
+setup-executable-permissions:
+	@echo "Setting up executable permissions for all scripts..."
+	@find . -name "*.sh" -exec chmod +x {} \; 2>/dev/null || true
+	@echo "All shell scripts are now executable."
+	@find . -name "Makefile" -exec chmod +x {} \; 2>/dev/null || true
+	@echo "Makefile permissions updated."
 
 # Create directories
 setup:
@@ -38,13 +57,14 @@ setup:
 	@echo "Setup completed."
 
 # Run installer
-run: check-deps make-executable
+run: check-deps make-executable setup
 	@./gentoo-installer.sh
 
 # Default target
 all: setup make-executable install-deps
 	@echo "Gentoo installer setup completed!"
 	@echo "Run with: ./gentoo-installer.sh"
+	@echo "Or use: make run"
 
 # Clean
 clean:
@@ -53,3 +73,18 @@ clean:
 	@rm -f /tmp/gentoo-*-config
 	@rm -f /tmp/gentoo-fstab
 	@echo "Clean completed."
+
+# Status check
+status:
+	@echo "=== Gentoo Installer Status ==="
+	@echo "Main script: $(if [ -f gentoo-installer.sh ]; then echo "EXISTS ($(stat -c%a gentoo-installer.sh))"; else echo "NOT FOUND"; fi)"
+	@echo "Modules directory: $(if [ -d modules ]; then echo "EXISTS"; else echo "NOT FOUND"; fi)"
+	@echo "Module files:"
+	@for module in install encryption disk stage config kernel portage filesystem bootloader finalize; do \
+		if [ -f "modules/$$module.sh" ]; then \
+			echo "  $$module.sh: EXISTS ($(stat -c%a modules/$$module.sh))"; \
+		else \
+			echo "  $$module.sh: NOT FOUND"; \
+		fi; \
+	done
+	@echo "Makefile: $(if [ -f Makefile ]; then echo "EXISTS ($(stat -c%a Makefile))"; else echo "NOT FOUND"; fi)"
