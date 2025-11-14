@@ -195,7 +195,7 @@ configure_use_flags() {
 }
 
 configure_license() {
-    dialog --title "ACCEPT_LICENSE Configuration" \
+    local choice=$(dialog --title "ACCEPT_LICENSE Configuration" \
         --menu "Choose license policy:" 12 50 4 \
         1 "@FREE (only free software - recommended)" \
         2 "@FREE @BINARY-REDISTRIBUTABLE (free + binary)" \

@@ -1,0 +1,1 @@
+local choice=$(dialog --title "ACCEPT_LICENSE Configuration" ...)
