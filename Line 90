@@ -1,0 +1,1 @@
+@echo "Makefile: $(if [ -f Makefile ]; then echo "EXISTS ($(stat -c%a Makefile))"; else echo "NOT FOUND"; fi)"

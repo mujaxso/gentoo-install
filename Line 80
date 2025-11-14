@@ -1,0 +1,1 @@
+@echo "Main script: $(if [ -f gentoo-installer.sh ]; then echo "EXISTS ($(stat -c%a gentoo-installer.sh))"; else echo "NOT FOUND"; fi)"

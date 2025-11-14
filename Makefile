@@ -77,14 +77,22 @@ clean:
 # Status check
 status:
 	@echo "=== Gentoo Installer Status ==="
-	@echo "Main script: $(if [ -f gentoo-installer.sh ]; then echo "EXISTS ($(stat -c%a gentoo-installer.sh))"; else echo "NOT FOUND"; fi)"
+	@if [ -f gentoo-installer.sh ]; then \
+		echo "Main script: EXISTS ($$(stat -c%a gentoo-installer.sh 2>/dev/null || echo 'unknown'))"; \
+	else \
+		echo "Main script: NOT FOUND"; \
+	fi
 	@echo "Modules directory: $(if [ -d modules ]; then echo "EXISTS"; else echo "NOT FOUND"; fi)"
 	@echo "Module files:"
 	@for module in install encryption disk stage config kernel portage filesystem bootloader finalize; do \
 		if [ -f "modules/$$module.sh" ]; then \
-			echo "  $$module.sh: EXISTS ($(stat -c%a modules/$$module.sh))"; \
+			echo "  $$module.sh: EXISTS ($$(stat -c%a modules/$$module.sh 2>/dev/null || echo 'unknown'))"; \
 		else \
 			echo "  $$module.sh: NOT FOUND"; \
 		fi; \
 	done
-	@echo "Makefile: $(if [ -f Makefile ]; then echo "EXISTS ($(stat -c%a Makefile))"; else echo "NOT FOUND"; fi)"
+	@if [ -f Makefile ]; then \
+		echo "Makefile: EXISTS ($$(stat -c%a Makefile 2>/dev/null || echo 'unknown'))"; \
+	else \
+		echo "Makefile: NOT FOUND"; \
+	fi
