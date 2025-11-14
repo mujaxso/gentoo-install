@@ -10,12 +10,14 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
 NC='\033[0m' # No Color
 
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MODULES_DIR="$SCRIPT_DIR/modules"
 CONFIG_FILE="/tmp/gentoo-install-config"
+LOG_FILE="/tmp/gentoo-install.log"
 
 # Default configuration
 declare -gA CONFIG
@@ -27,18 +29,27 @@ CONFIG[use_raid]="false"
 CONFIG[hostname]="gentoo"
 CONFIG[timezone]="UTC"
 CONFIG[keymap]="us"
+CONFIG[stage_tarball]="stage3-amd64"
+CONFIG[kernel_type]="genkernel"
+CONFIG[bootloader_type]="grub2"
+CONFIG[locale]="en_US.UTF-8"
+CONFIG[username]="gentoo"
 
 # Logging
 log() {
-    echo -e "${GREEN}[INFO]${NC} $1"
+    echo -e "${GREEN}[INFO]${NC} $1" | tee -a "$LOG_FILE"
 }
 
 warn() {
-    echo -e "${YELLOW}[WARN]${NC} $1"
+    echo -e "${YELLOW}[WARN]${NC} $1" | tee -a "$LOG_FILE"
 }
 
 error() {
-    echo -e "${RED}[ERROR]${NC} $1"
+    echo -e "${RED}[ERROR]${NC} $1" | tee -a "$LOG_FILE"
+}
+
+success() {
+    echo -e "${GREEN}[SUCCESS]${NC} $1" | tee -a "$LOG_FILE"
 }
 
 # Check if running as root
@@ -47,6 +58,12 @@ check_root() {
         error "This script must be run as root"
         exit 1
     fi
+}
+
+# Initialize log file
+init_log() {
+    echo "Gentoo Linux Installer Log - $(date)" > "$LOG_FILE"
+    echo "========================================" >> "$LOG_FILE"
 }
 
 # Load configuration
@@ -59,6 +76,7 @@ load_config() {
 
 # Save configuration
 save_config() {
+    > "$CONFIG_FILE"
     for key in "${!CONFIG[@]}"; do
         echo "CONFIG[$key]=\"${CONFIG[$key]}\"" >> "$CONFIG_FILE"
     done
@@ -156,6 +174,10 @@ show_review_menu() {
     summary+="Hostname: ${CONFIG[hostname]}\n"
     summary+="Timezone: ${CONFIG[timezone]}\n"
     summary+="Keymap: ${CONFIG[keymap]}\n"
+    summary+="Stage Tarball: ${CONFIG[stage_tarball]}\n"
+    summary+="Kernel: ${CONFIG[kernel_type]}\n"
+    summary+="Bootloader: ${CONFIG[bootloader_type]}\n"
+    summary+="Locale: ${CONFIG[locale]}\n"
 
     dialog --title "Review Configuration" \
         --yesno "$summary\n\nProceed with installation?" 20 70
@@ -170,20 +192,31 @@ confirm_exit() {
 
 # Check dependencies
 check_dependencies() {
-    local deps=("parted" "mkfs.ext4" "mkfs.btrfs" "zfs" "cryptsetup" "mdadm")
+    local deps=("parted" "mkfs.ext4" "mkfs.btrfs" "zfs" "cryptsetup" "mdadm" "wget")
+    local missing_deps=()
     
     for dep in "${deps[@]}"; do
         if ! command -v "$dep" &> /dev/null; then
-            warn "Missing dependency: $dep"
+            missing_deps+=("$dep")
         fi
     done
+    
+    if [[ ${#missing_deps[@]} -gt 0 ]]; then
+        warn "Missing dependencies: ${missing_deps[*]}"
+        dialog --title "Missing Dependencies" \
+            --msgbox "The following dependencies are missing:\n${missing_deps[*]}\n\nPlease install them with:\nemerge ${missing_deps[*]}" 12 50
+        return 1
+    fi
 }
 
 # Initialize
 main() {
+    # Initialize log
+    init_log
+    
     # Check if dialog is available
     if ! command -v dialog &> /dev/null; then
-        error "dialog is required but not installed. Please install: emerge dialog"
+        error "dialog is required but not installed. Please install: emerge sys-apps/dialog"
         exit 1
     fi
 
@@ -198,10 +231,13 @@ main() {
     
     # Welcome message
     dialog --title "Gentoo Linux Installer" \
-        --msgbox "Welcome to the Gentoo Linux Installer!\n\nThis installer supports:\n- OpenRC and systemd\n- EFI and BIOS\n- ext4, zfs, btrfs filesystems\n- LUKS encryption\n- Software RAID (mdadm)\n\nPlease follow the prompts to configure your installation." 15 60
+        --msgbox "Welcome to the Gentoo Linux Installer!\n\nThis installer supports:\n- OpenRC and systemd\n- EFI and BIOS\n- ext4, zfs, btrfs filesystems\n- LUKS encryption\n- Software RAID (mdadm)\n- Complete Gentoo installation\n\nPlease follow the prompts to configure your installation." 15 60
 
     # Create modules directory
     mkdir -p "$MODULES_DIR"
+    
+    # Save initial config
+    save_config
     
     # Show main menu
     show_main_menu
