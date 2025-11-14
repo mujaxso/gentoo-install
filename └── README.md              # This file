@@ -1,0 +1,89 @@
+
+## Configuration Files
+
+The installer creates temporary configuration files:
+- `/tmp/gentoo-install-config` - Main installation configuration
+- `/tmp/gentoo-disk-config` - Disk and partitioning configuration
+- `/tmp/gentoo-filesystem-config` - Filesystem configuration
+- `/tmp/gentoo-encryption-config` - Encryption configuration
+- `/tmp/gentoo-fstab` - Generated fstab file
+
+## Requirements
+
+- Gentoo Linux (source-based distribution)
+- Root access
+- Internet connection for downloading stage tarballs
+- Minimum 2GB RAM (for kernel compilation)
+- Sufficient disk space (recommended 20GB+)
+
+## Supported Disk Layouts
+
+### Simple Layout
+- Boot partition (512MB)
+- Root partition (remaining space)
+
+### Advanced Layout
+- EFI System Partition (512MB)
+- Boot partition (512MB)
+- Swap partition (2GB or more)
+- Root partition (remaining space)
+- Optional separate /home and /var partitions
+
+### Encrypted Layout
+- EFI System Partition (unencrypted or encrypted)
+- Boot partition (optionally encrypted)
+- Root partition (LUKS encrypted)
+
+### RAID Layout
+- Multiple disks in RAID arrays
+- Separate RAID arrays for boot and root
+- Hardware or software RAID support
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Missing dependencies**: Run `make install-deps`
+2. **Dialog not found**: Install with `emerge sys-apps/dialog`
+3. **Insufficient disk space**: Ensure adequate free space (20GB+)
+4. **Network issues**: Verify internet connection for downloading
+
+### Log Files
+
+The installer creates log files in `/tmp/`:
+- `gentoo-install.log` - Main installation log
+- Partitioning and formatting logs
+- Installation progress logs
+
+### Getting Help
+
+- Gentoo Handbook: https://wiki.gentoo.org/wiki/Handbook
+- Installation Guide: https://wiki.gentoo.org/wiki/Installation_guide
+- Support Forums: https://forums.gentoo.org/
+
+## Safety Notes
+
+⚠️ **WARNING**: This installer will partition and format disks. All data on selected disks will be lost!
+
+- Always backup important data before using this installer
+- Verify disk selection carefully
+- Test on virtual machines before real hardware
+- Review configuration before executing installation
+
+## Contributing
+
+Contributions are welcome! Areas for improvement:
+
+- Additional filesystem support
+- More bootloader options
+- Better error handling
+- Enhanced TUI interface
+- Automated post-installation setup
+
+## License
+
+This installer is provided as-is for educational and practical use. Use at your own risk.
+
+## Disclaimer
+
+This installer is not officially affiliated with Gentoo Foundation. Please refer to official Gentoo documentation for authoritative installation instructions.
