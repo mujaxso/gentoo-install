@@ -1,150 +1,149 @@
 
+## Key Improvements Over Previous Version
+
+### AMD64 Handbook Compliance
+- Uses fdisk instead of parted
+- XFS as recommended filesystem
+- Proper stage3 naming with init system suffixes
+- Profile-based system configuration
+- Binary package host support
+- Modern bootloader options
+
+### Enhanced Features
+- **Secure Boot Support**: Complete key management and signing
+- **Distribution Kernels**: Automated kernel management
+- **Binary Package Host**: Fast installations with signed packages
+- **Modern Profiles**: Desktop, hardened, no-multilib options
+- **Improved Error Handling**: Better validation and recovery
+- **Enhanced TUI**: More comprehensive menu system
+
+### Installation Speed
+- Binary package host for fast installations
+- Distribution kernels for automated updates
+- Optimized make.conf settings
+- Smart mirror selection
+
 ## Configuration Files
 
-The installer creates and manages several configuration files:
+The installer creates and manages:
 - `/tmp/gentoo-install-config` - Main installation configuration
 - `/tmp/gentoo-disk-config` - Disk and partitioning configuration
 - `/tmp/gentoo-filesystem-config` - Filesystem configuration
 - `/tmp/gentoo-encryption-config` - Encryption configuration
-- `/tmp/gentoo-system-config` - System configuration
-- `/tmp/gentoo-fstab` - Generated fstab file
+- `/tmp/gentoo-stage-config` - Stage file configuration
+- `/tmp/gentoo-portage-config` - Portage configuration
+- `/tmp/gentoo-kernel-config` - Kernel configuration
 - `/tmp/gentoo-install.log` - Installation progress log
-
-## Advanced Features
-
-### Automated Installation
-- Fully automated stage 3 download and extraction
-- Automatic Portage tree synchronization
-- Kernel compilation with genkernel
-- Bootloader installation and configuration
-- Service enablement and system finalization
-
-### Network Configuration
-- DHCP automatic configuration
-- Static IP setup with custom gateway/DNS
-- NetworkManager integration
-- systemd-networkd support
-
-### Security Features
-- LUKS encryption with secure key management
-- Firewall configuration (iptables)
-- Fail2ban intrusion prevention
-- Automatic security updates
-
-### Bootloader Support
-- **GRUB2**: Full-featured bootloader with theme support
-- **systemd-boot**: Lightweight UEFI bootloader
-- **rEFInd**: Modern UEFI bootloader with GUI
-
-### RAID Configuration
-- Automatic RAID array creation
-- Support for multiple RAID levels
-- RAID monitoring and management
 
 ## Post-Installation
 
 After successful installation:
 
-1. **Create regular user accounts**
-2. **Configure additional services**
+1. **Reboot into new system**
+2. **Complete user setup**
+   ```bash
+   # Add regular user
+   useradd -m -G wheel,audio,video,usb username
+   passwd username
+   ```
 3. **Update system**
    ```bash
    emerge --sync
    emerge -avuDN @world
    ```
-4. **Install additional packages**
-5. **Configure system services**
-6. **Update bootloader configuration**
+4. **Configure services**
+5. **Install additional packages**
+6. **Set up desktop environment** (if using desktop profile)
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **Missing dependencies**
-   ```bash
-   make install-deps
-   ```
+1. **Stage file download fails**
+   - Check internet connection
+   - Verify date/time is correct
+   - Try different mirror
 
-2. **Insufficient disk space**
-   - Ensure 20GB+ free space
-   - Check partition sizes during configuration
+2. **Partitioning issues**
+   - Ensure target disks are available
+   - Check for existing partitions
+   - Verify sufficient disk space
 
-3. **Network issues**
-   - Verify internet connection
-   - Test DNS resolution
-   - Check firewall settings
-
-4. **Kernel compilation failures**
+3. **Kernel compilation fails**
+   - Use distribution kernel instead
    - Increase swap space
-   - Ensure adequate RAM (4GB+)
-   - Check hardware compatibility
+   - Check available RAM
 
-5. **Bootloader installation issues**
-   - Verify EFI/BIOS mode compatibility
-   - Check disk partitioning alignment
-   - Ensure proper mount points
+4. **Bootloader installation fails**
+   - Verify ESP is mounted (UEFI)
+   - Check boot mode compatibility
+   - Ensure proper disk is selected
 
-### Log Files
+### Recovery Steps
 
-- Installation log: `/tmp/gentoo-install.log`
-- System log: `/var/log/messages`
-- Boot log: `dmesg`
-
-### Recovery
-
-If installation fails:
-1. Check `/tmp/gentoo-install.log`
+1. Check installation logs: `/tmp/gentoo-install.log`
 2. Verify configuration files in `/tmp/`
 3. Re-run installer with existing configuration
 4. Manual intervention via chroot
 
+### Getting Help
+
+- **Gentoo Handbook**: https://wiki.gentoo.org/wiki/Handbook:AMD64
+- **Gentoo Forums**: https://forums.gentoo.org/
+- **Gentoo IRC**: #gentoo on libera.chat
+- **Installation Guide**: https://wiki.gentoo.org/wiki/Installation_guide
+
 ## Safety Notes
 
-⚠️ **WARNING**: This installer will partition and format disks. All data on selected disks will be lost!
+⚠️ **WARNING**: This installer will partition and format disks!
 
-- Always backup important data before installation
-- Verify disk selection carefully in the installer
-- Test on virtual machines before real hardware
-- Review all configuration choices before execution
+- Always backup important data
+- Verify disk selection carefully
+- Test in virtual machine first
+- Review all configuration choices
 - Keep installation logs for troubleshooting
 
 ## System Requirements
 
-### Minimum Requirements
-- 2GB RAM (4GB+ recommended)
-- 20GB disk space
-- x86_64 architecture
+### Minimum
+- x86-64 CPU (AMD64/Intel 64)
+- 2GB RAM, 8GB disk space
 - UEFI or BIOS support
 - Internet connection
 
-### Recommended Specifications
+### Recommended
 - 8GB+ RAM (for parallel compilation)
-- 100GB+ disk space (for build processes)
-- SSD storage (for faster compilation)
+- 100GB+ disk space
+- SSD storage
 - Multiple CPU cores
 
 ## Contributing
 
-Contributions are welcome! Areas for improvement:
-
-- Additional filesystem support (f2fs, nilfs2)
-- Enhanced error handling and recovery
-- Advanced RAID configuration
-- More bootloader options (LILO, GRUB Legacy)
-- Automated post-installation setup
-- Integration with Gentoo scripts (gentoo-kernel)
+Areas for improvement:
+- Additional profiles (server, etc.)
+- More bootloader options
+- Enhanced desktop integration
+- Improved recovery options
+- Better error reporting
 
 ## License
 
-This installer is provided as-is for educational and practical use. Use at your own risk.
+This installer is provided as-is for educational and practical use.
 
 ## Disclaimer
 
-This installer is not officially affiliated with Gentoo Foundation. Please refer to official Gentoo documentation for authoritative installation instructions.
+Not officially affiliated with Gentoo Foundation. Refer to official documentation for authoritative instructions.
 
-## Support
+## Changelog
 
-- **Official Gentoo Handbook**: https://wiki.gentoo.org/wiki/Handbook
-- **Installation Guide**: https://wiki.gentoo.org/wiki/Installation_guide
-- **Gentoo Forums**: https://forums.gentoo.org/
-- **Gentoo IRC**: #gentoo on libera.chat
+### Latest Version
+- ✅ AMD64 Handbook compatibility
+- ✅ fdisk partitioning (GPT/MBR)
+- ✅ XFS as recommended filesystem
+- ✅ Modern stage3 naming conventions
+- ✅ Profile-based configuration
+- ✅ Binary package host support
+- ✅ Distribution kernel support
+- ✅ Secure Boot integration
+- ✅ Enhanced TUI interface
+- ✅ Comprehensive error handling

@@ -1,57 +1,65 @@
-# Gentoo Linux Installer
+# Gentoo Linux Installer - AMD64 Handbook Compatible
 
-A comprehensive modular interactive shell script installer for Gentoo Linux with TUI interface.
+A comprehensive modular interactive shell script installer for Gentoo Linux with TUI interface, fully compatible with the latest AMD64 Handbook installation methods.
 
 ## Features
 
+- **AMD64 Handbook Compliant**: Follows the latest installation procedures
 - **Complete Installation**: Full Gentoo installation from stage 3 to bootable system
 - **TUI Interface**: User-friendly text-based interface using `dialog`
 - **Multiple Init Systems**: Support for OpenRC and systemd
 - **Boot Support**: Both EFI and BIOS/Legacy boot modes
-- **Filesystem Support**: ext4, btrfs, zfs, and xfs
+- **Modern Filesystems**: XFS (recommended), ext4, btrfs, zfs, f2fs
 - **Encryption**: LUKS encryption for root and boot partitions
 - **RAID Support**: Software RAID (mdadm) configuration
+- **Binary Package Host**: Support for Gentoo's official binary packages
+- **Distribution Kernels**: Automated kernel management
+- **Secure Boot**: Optional Secure Boot support with key management
 - **Modular Design**: Separate modules for different installation aspects
 
-## Complete Installation Process
+## AMD64 Handbook Compatibility
 
-### 1. System Information
-- Init system selection (OpenRC/systemd)
-- Boot mode (EFI/BIOS)
-- Hostname, timezone, keymap configuration
+This installer follows the official AMD64 Handbook methods:
 
-### 2. Disk Configuration
-- Disk selection and partitioning
-- Partition size configuration
-- Software RAID setup
+### Latest Installation Process
 
-### 3. Filesystem Setup
-- Root, boot, home, var filesystem selection
-- Separate partition configuration
-- Mount options
+1. **System Information & Profile Selection**
+   - Modern profile-based system configuration
+   - Desktop, hardened, and no-multilib profiles
+   - Init system selection (OpenRC/systemd)
 
-### 4. Encryption (LUKS)
-- Root and boot partition encryption
-- LUKS1/LUKS2 version selection
-- Keyfile support
+2. **Disk Configuration**
+   - fdisk partitioning (GPT for UEFI, MBR for BIOS)
+   - Recommended partition sizes (1GB ESP, etc.)
+   - Proper partition table creation
 
-### 5. Gentoo Installation
-- Stage 3 tarball download and extraction
-- Portage tree synchronization
-- Kernel compilation (genkernel/custom/distribution)
-- Network configuration
+3. **Filesystem Setup**
+   - XFS as recommended filesystem
+   - Proper ESP formatting for UEFI
+   - Modern mount options
 
-### 6. System Configuration
-- User and password setup
-- Service configuration (SSH, NetworkManager, etc.)
-- Locale and timezone settings
-- Bootloader installation and configuration
-- Security settings (firewall, fail2ban)
+4. **Stage File Selection**
+   - Proper stage3 naming with init system suffixes
+   - Download verification with checksums
+   - Optimized make.conf configuration
 
-### 7. Final System Setup
-- Automatic service enablement
-- System finalization and cleanup
-- Installation verification
+5. **Portage Configuration**
+   - Profile-based configuration
+   - USE flags optimization
+   - Binary package host support
+   - Modern licensing policies
+
+6. **Kernel Setup**
+   - Distribution kernels (recommended)
+   - Optional manual configuration
+   - Linux firmware installation
+   - Microcode updates
+
+7. **Modern Bootloaders**
+   - GRUB2 with UEFI/BIOS support
+   - systemd-boot for systemd systems
+   - EFI stub support
+   - Secure Boot integration
 
 ## Supported Configurations
 
@@ -60,42 +68,50 @@ A comprehensive modular interactive shell script installer for Gentoo Linux with
 - **systemd** (full integration)
 
 ### Boot Modes
-- **EFI** (UEFI) with GRUB2, systemd-boot, rEFInd
-- **BIOS/Legacy** with GRUB2
+- **EFI** (UEFI) with GPT partitioning
+- **BIOS/Legacy** with MBR partitioning
 
-### Stage Tarballs
-- stage3-amd64 (recommended)
-- stage3-amd64-hardened
-- stage3-amd64-nomultilib
-- stage3-amd64-musl
-- Custom stage tarball URLs
+### Stage Tarballs (Updated Naming)
+- stage3-amd64-openrc (recommended)
+- stage3-amd64-systemd
+- stage3-amd64-*-desktop (desktop optimized)
+- stage3-amd64-no-multilib (pure 64-bit)
+- stage3-amd64-hardened (security focused)
+- stage3-amd64-musl (alternative libc)
+
+### Profiles
+- default/linux/amd64/23.0 (base)
+- default/linux/amd64/23.0/desktop (desktop optimized)
+- default/linux/amd64/23.0/desktop/gnome
+- default/linux/amd64/23.0/desktop/kde
+- default/linux/amd64/23.0/no-multilib (pure 64-bit)
+- default/linux/amd64/23.0/hardened (security focused)
 
 ### Kernel Options
-- **genkernel** (beginner-friendly, automated)
-- **genkernel-next** (modern genkernel)
-- **Custom kernel compilation** (manual configuration)
-- **Distribution kernel** (pre-compiled)
-- **Kernel sources only** (user compiles manually)
+- **Distribution Kernel** (recommended - automated)
+- **Manual Configuration** (advanced users)
+- **EFI Stub** (minimal, UEFI only)
+- **Genkernel** (deprecated, not recommended)
 
 ### Filesystems
-- **ext4** (stable, feature-rich)
-- **btrfs** (copy-on-write, snapshots, compression)
-- **zfs** (advanced filesystem, built-in RAID)
-- **xfs** (high-performance, large files)
+- **XFS** (recommended - all-purpose, all-platform)
+- **ext4** (reliable, all-purpose)
+- **btrfs** (advanced features, snapshots, compression)
+- **zfs** (next-generation, built-in RAID)
+- **f2fs** (flash-friendly for SSD/USB)
 - **vfat** (EFI System Partition)
 
-### Encryption
-- **LUKS1** (legacy compatibility)
-- **LUKS2** (modern, recommended)
-- Root partition encryption
-- Boot partition encryption
-- Keyfile support for automated unlocking
+### Binary Package Host
+- Official Gentoo binary packages
+- Significantly faster installations
+- Cryptographically signed packages
+- Automatic fallback to source compilation
 
-### RAID
-- **Software RAID** (mdadm)
-- RAID 0, 1, 5, 6, 10 support
-- Automatic RAID configuration
-- RAID monitoring
+### Advanced Features
+- **Secure Boot** support with key management
+- **Firmware** installation (WiFi, GPU, etc.)
+- **Microcode** updates for Intel/AMD CPUs
+- **Modern bootloaders** with full UEFI support
 
 ## Installation
 
@@ -103,12 +119,13 @@ A comprehensive modular interactive shell script installer for Gentoo Linux with
 - Gentoo Linux boot media
 - Root access
 - Internet connection
-- Minimum 20GB disk space
-- Minimum 2GB RAM (4GB+ recommended for compilation)
+- x86-64 architecture
+- Minimum 2GB RAM, 8GB disk space
+- UEFI or BIOS support
 
 ### Setup Steps
 
-1. **Download and prepare installer**
+1. **Clone the repository**
    ```bash
    git clone <repository>
    cd gentoo-installer
@@ -119,15 +136,17 @@ A comprehensive modular interactive shell script installer for Gentoo Linux with
    make install-deps
    ```
    
-   Or manually:
+   Manual installation:
    ```bash
    emerge sys-apps/dialog
-   emerge sys-block/parted
+   emerge sys-block/fdisk
+   emerge sys-fs/xfsprogs
    emerge sys-fs/e2fsprogs
    emerge sys-fs/btrfs-progs
    emerge sys-fs/cryptsetup
    emerge sys-fs/mdadm
    emerge net-misc/wget
+   emerge app-crypt/gnupg
    ```
 
 3. **Run the installer**
@@ -140,61 +159,70 @@ A comprehensive modular interactive shell script installer for Gentoo Linux with
    ./gentoo-installer.sh
    ```
 
-## Usage Guide
+## Installation Steps
 
-### Step-by-Step Installation
+### 1. System Information & Profile Selection
+- Choose init system (OpenRC/systemd)
+- Select boot mode (EFI/BIOS)
+- Pick appropriate system profile
+- Configure hostname, timezone, keymap
+- Optional: Enable binary package host
 
-1. **Welcome Screen**
-   - Review installer capabilities
-   - Confirm system requirements
+### 2. Disk Configuration
+- Select boot and root devices
+- Choose partition table (GPT/MBR)
+- Configure partition sizes
+- Partition with fdisk (following handbook)
+- Format with recommended filesystems
 
-2. **System Information**
-   - Choose init system (OpenRC/systemd)
-   - Select boot mode (EFI/BIOS)
-   - Set hostname, timezone, keymap
+### 3. Filesystem Setup
+- Root: XFS (recommended by handbook)
+- Boot: vfat (UEFI) or xfs (BIOS)
+- Configure mount options
+- Set up separate partitions if desired
 
-3. **Disk Configuration**
-   - Select boot and root devices
-   - Configure partition sizes
-   - Set up RAID if needed
+### 4. Stage File Selection
+- Choose appropriate stage3 tarball
+- Set up mirror selection
+- Configure date/time (critical for HTTPS)
+- Download and verify stage file
+- Extract to /mnt/gentoo
+- Configure optimized make.conf
 
-4. **Filesystem Setup**
-   - Choose filesystem for each partition
-   - Configure separate partitions (/home, /var)
-   - Set mount options
+### 5. Portage Configuration
+- Install Gentoo ebuild repository
+- Select system profile
+- Configure mirrors
+- Sync Portage tree
+- Set up USE flags and licenses
+- Optional: Configure binary package host
 
-5. **Encryption Configuration**
-   - Enable LUKS encryption for root/boot
-   - Configure encryption options
-   - Test encryption setup
+### 6. Kernel Setup
+- Install Linux firmware (recommended)
+- Choose kernel method:
+  - Distribution kernel (automated, recommended)
+  - Manual configuration (advanced)
+- Optional: Configure Secure Boot
+- Set up kernel modules
 
-6. **Gentoo Installation**
-   - Select stage tarball type
-   - Choose kernel compilation method
-   - Configure Portage synchronization
-   - Set up network configuration
+### 7. System Configuration
+- Set timezone and locale
+- Configure networking
+- Create users and set passwords
+- Set up system services
+- Configure final system settings
 
-7. **System Configuration**
-   - Create users and set passwords
-   - Configure services (SSH, NetworkManager, etc.)
-   - Set locale and timezone
-   - Choose bootloader
+### 8. Bootloader Installation
+- GRUB2 (default, UEFI/BIOS support)
+- systemd-boot (systemd systems)
+- EFI Stub (minimal approach)
+- Configure bootloader options
 
-8. **Review and Execute**
-   - Review all configuration choices
-   - Confirm installation
-   - Begin automated installation process
-
-### Installation Progress
-
-The installer provides real-time progress feedback:
-- Environment preparation (10%)
-- Stage 3 download and extraction (20-30%)
-- Portage configuration (30-50%)
-- Kernel compilation (50-70%)
-- System configuration (70-80%)
-- Bootloader installation (80-90%)
-- Finalization (90-100%)
+### 9. Finalization
+- Generate fstab
+- Enable services
+- Perform system cleanup
+- Complete installation
 
 ## Module Structure
 
